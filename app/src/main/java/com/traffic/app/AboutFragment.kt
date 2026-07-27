@@ -1,8 +1,12 @@
 package com.traffic.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -29,7 +33,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.4"
+        const val CURRENT_VERSION = "1.1.5"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -41,11 +45,14 @@ class AboutFragment : Fragment() {
     private lateinit var progressBar: ProgressBar
     private var sheetOverlay: View? = null
     private var storedSheetH = 0
+    private var shimmerAnimator: ValueAnimator? = null
+    private var cachedDp = 0f
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
         val t   = AppTheme.current
         val dp  = ctx.resources.displayMetrics.density
+        cachedDp = dp
 
         val scroll = ScrollView(ctx).apply { background = bgDrawable(t) }
         val layout = LinearLayout(ctx).apply {
@@ -88,10 +95,32 @@ class AboutFragment : Fragment() {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = (16 * dp).toInt() }
         }
-        logoCard.addView(TextView(ctx).apply {
-            text = "EOS"; textSize = 42f; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor(t.accent))
-            gravity = Gravity.CENTER_HORIZONTAL
+        val shimmerColors = intArrayOf(
+            Color.parseColor(t.textSecondary),
+            Color.parseColor(t.accent),
+            Color.parseColor(t.textPrimary),
+            Color.parseColor(t.accent),
+            Color.parseColor(t.textSecondary),
+        )
+        logoCard.addView(object : TextView(ctx) {
+            private val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 2400; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
+                addUpdateListener { invalidate() }
+                start()
+            }
+            init {
+                text = "EOS"; textSize = 42f; typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+            override fun onDraw(canvas: Canvas) {
+                val w = width.toFloat(); if (w == 0f) { super.onDraw(canvas); return }
+                val frac = anim.animatedValue as Float
+                val start = -w + frac * 3f * w
+                paint.shader = LinearGradient(start, 0f, start + w, 0f, shimmerColors, null, Shader.TileMode.CLAMP)
+                super.onDraw(canvas)
+            }
+            override fun onDetachedFromWindow() { super.onDetachedFromWindow(); anim.cancel() }
         })
         logoCard.addView(TextView(ctx).apply {
             text = "SYSTEM"; textSize = 12f; letterSpacing = 0.3f; typeface = Typeface.DEFAULT_BOLD
@@ -106,23 +135,7 @@ class AboutFragment : Fragment() {
         })
         layout.addView(logoCard)
 
-        // ── Описание ──────────────────────────────────────────────────────────
-        layout.addView(infoCard(ctx, t, dp,
-            "📋", "Описание",
-            "Система мониторинга светофоров в реальном времени. Показывает состояние перекрёстков, карту и позволяет настраивать тайминги."
-        ))
-        layout.addView(spacer(ctx, dp, 12f))
-
-        layout.addView(infoCard(ctx, t, dp,
-            "🔗", "Репозиторий",
-            "github.com/$GITHUB_OWNER/$GITHUB_REPO"
-        ).also { card ->
-            card.isClickable = true; card.isFocusable = true
-            card.setOnClickListener {
-                startActivity(Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://github.com/$GITHUB_OWNER/$GITHUB_REPO")))
-            }
-        })
+        layout.addView(infoCard(ctx, t, dp, "👤", "Создатель", "Ekkir"))
         layout.addView(spacer(ctx, dp, 20f))
 
         // ── Обновления ────────────────────────────────────────────────────────
@@ -182,6 +195,37 @@ class AboutFragment : Fragment() {
         super.onDestroyView()
         handler.removeCallbacksAndMessages(null)
         executor.shutdown()
+        shimmerAnimator?.cancel()
+    }
+
+    private fun startButtonShimmer() {
+        val t = AppTheme.current
+        shimmerAnimator?.cancel()
+        shimmerAnimator = ValueAnimator.ofArgb(
+            Color.parseColor(t.accent),
+            Color.parseColor(t.textPrimary),
+            Color.parseColor(t.accent),
+        ).apply {
+            duration = 900; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { anim ->
+                if (!isAdded) return@addUpdateListener
+                updateBtn.background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = 12f * cachedDp
+                    setColor(anim.animatedValue as Int)
+                }
+            }
+            start()
+        }
+    }
+
+    private fun stopButtonShimmer() {
+        shimmerAnimator?.cancel(); shimmerAnimator = null
+        if (!isAdded) return
+        val t = AppTheme.current
+        updateBtn.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE; cornerRadius = 12f * cachedDp
+            setColor(Color.parseColor(t.accent))
+        }
     }
 
     private fun showBottomSheet(version: String, summary: String, actionLabel: String, onAction: () -> Unit) {
@@ -287,6 +331,7 @@ class AboutFragment : Fragment() {
     private fun checkForUpdates(ctx: Context, dp: Float) {
         updateBtn.isEnabled = false
         updateBtn.text = "Проверяю..."
+        startButtonShimmer()
         updateStatus.text = "Подключаюсь к GitHub..."
         progressBar.isIndeterminate = true
         progressBar.visibility = View.VISIBLE
@@ -305,6 +350,7 @@ class AboutFragment : Fragment() {
                         if (!isAdded) return@post
                         progressBar.isIndeterminate = false
                         progressBar.visibility = View.GONE
+                        stopButtonShimmer()
                         updateStatus.setTextColor(Color.parseColor(AppTheme.current.textSecondary))
                         updateStatus.text = "У вас последняя версия ($CURRENT_VERSION)\nОбновлений пока нет"
                         updateBtn.isEnabled = true
@@ -343,6 +389,7 @@ class AboutFragment : Fragment() {
                     if (!isAdded) return@post
                     progressBar.isIndeterminate = false
                     progressBar.visibility = View.GONE
+                    stopButtonShimmer()
 
                     if (hasUpdate) {
                         updateStatus.setTextColor(Color.parseColor(AppTheme.current.accent))
@@ -379,6 +426,7 @@ class AboutFragment : Fragment() {
                     if (!isAdded) return@post
                     progressBar.isIndeterminate = false
                     progressBar.visibility = View.GONE
+                    stopButtonShimmer()
                     updateStatus.setTextColor(Color.parseColor("#FF6B6B"))
                     updateStatus.text = "Не удалось подключиться к GitHub"
                     updateBtn.isEnabled = true

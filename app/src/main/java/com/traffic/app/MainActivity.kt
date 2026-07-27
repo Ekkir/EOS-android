@@ -1,6 +1,7 @@
 package com.traffic.app
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -8,12 +9,15 @@ import android.graphics.Outline
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
+import androidx.work.*
+import java.util.concurrent.TimeUnit
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
@@ -61,6 +65,12 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         val prefs = getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("theme_chosen", false)) {
             showThemePickerSheet()
+        }
+        scheduleUpdateCheck()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+            }
         }
 
         if (savedInstanceState == null) {
@@ -386,6 +396,17 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         }
         tx.commit()
         activeIndex = index
+    }
+
+    private fun scheduleUpdateCheck() {
+        val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(12, TimeUnit.HOURS)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "eos_update_check",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     private fun showThemePickerSheet() {

@@ -11,8 +11,8 @@ android {
         applicationId "com.traffic.app"
         minSdk 21
         targetSdk 36
-        versionCode 6
-        versionName "1.1.4"
+        versionCode 7
+        versionName "1.1.5"
     }
 
     buildTypes {
@@ -34,4 +34,5 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'org.osmdroid:osmdroid-android:6.1.18'
+    implementation 'androidx.work:work-runtime:2.9.0'
 }
