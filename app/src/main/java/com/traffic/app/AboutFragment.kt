@@ -191,6 +191,21 @@ class AboutFragment : Fragment() {
                 conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
+                val code = conn.responseCode
+                if (code == 404) {
+                    conn.disconnect()
+                    handler.post {
+                        if (!isAdded) return@post
+                        progressBar.isIndeterminate = false
+                        progressBar.visibility = View.GONE
+                        updateStatus.setTextColor(Color.parseColor(AppTheme.current.textSecondary))
+                        updateStatus.text = "У вас последняя версия ($CURRENT_VERSION)\nОбновлений пока нет"
+                        updateBtn.isEnabled = true
+                        updateBtn.text = "Проверить ещё раз"
+                        updateBtn.setOnClickListener { checkForUpdates(ctx, dp) }
+                    }
+                    return@execute
+                }
                 val json = JSONObject(conn.inputStream.bufferedReader().readText())
                 conn.disconnect()
 
