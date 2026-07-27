@@ -18,9 +18,9 @@ data class ThemeDef(
 object AppTheme {
     val themes = listOf(
         ThemeDef(
-            "glass", "Стекло", "#0A1428", "#1EFFFFFF", "#CC0D1A36", "#56D4FF",
-            textPrimary = "#EDF6FF", textSecondary = "#7BAFC8",
-            cardBorder = "#48FFFFFF", isGlass = true,
+            "glass", "Стекло", "#1A0E00", "#0AFFFFFF", "#CC2A1500", "#D4A040",
+            textPrimary = "#F2E8D5", textSecondary = "#A07850",
+            cardBorder = "#40FFFFFF", isGlass = true,
         ),
         ThemeDef(
             "glassneon", "Стекло+Неон", "#0A002A", "#1ECC00FF", "#CC0A0025", "#CC00FF",
