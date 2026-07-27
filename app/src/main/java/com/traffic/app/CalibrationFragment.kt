@@ -246,6 +246,13 @@ class CalibrationFragment : Fragment() {
         layout.addView(sectionLabel(ctx, "Оформление", t, dp))
         layout.addView(spacer(ctx, dp, 12f))
 
+        val accentPresets = mapOf(
+            "glass"     to listOf("#0A84FF","#BF5AF2","#FF375F","#30D158","#FF9F0A","#5AC8FA"),
+            "glassneon" to listOf("#CC00FF","#00FF7F","#00BFFF","#FF00AA","#FFD700","#FF4400"),
+            "neon"      to listOf("#00FFFF","#FF00FF","#00FF00","#FFFF00","#FF6600","#FF0066"),
+            "minimal"   to listOf("#DDDDDD","#AAAAAA","#88AACC","#CCAA77","#77AACC","#CC8888"),
+        )
+
         val currentId = prefs.getString("theme_id", "glass") ?: "glass"
         AppTheme.themes.forEach { theme ->
             val isSelected = theme.id == currentId
@@ -308,6 +315,43 @@ class CalibrationFragment : Fragment() {
                 requireActivity().recreate()
             }
             layout.addView(card)
+
+            if (isSelected) {
+                val presets = accentPresets[theme.id] ?: emptyList()
+                val customAccent = prefs.getString("accent_${theme.id}", theme.accent) ?: theme.accent
+                val swatchRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                }
+                swatchRow.addView(TextView(ctx).apply {
+                    text = "Акцент"; textSize = 12f
+                    setTextColor(Color.parseColor(t.textSecondary))
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        marginEnd = (12 * dp).toInt()
+                    }
+                })
+                presets.forEach { color ->
+                    val active = color.equals(customAccent, ignoreCase = true)
+                    val size = (32 * dp).toInt()
+                    swatchRow.addView(View(ctx).apply {
+                        layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = (8 * dp).toInt() }
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(Color.parseColor(color))
+                            setStroke(if (active) (2 * dp).toInt() else 0, Color.WHITE)
+                        }
+                        isClickable = true; isFocusable = true
+                        setOnClickListener {
+                            prefs.edit().putString("accent_${theme.id}", color).apply()
+                            AppTheme.apply(ctx, theme.id)
+                            requireActivity().recreate()
+                        }
+                    })
+                }
+                layout.addView(swatchRow)
+            }
         }
 
         return scroll

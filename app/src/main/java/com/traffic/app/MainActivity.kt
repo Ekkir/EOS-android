@@ -7,10 +7,12 @@ import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -55,6 +57,11 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         buildHeader()
         buildDrawer()
         applyInsets()
+
+        val prefs = getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("theme_chosen", false)) {
+            showThemePickerSheet()
+        }
 
         if (savedInstanceState == null) {
             val initTx = supportFragmentManager.beginTransaction()
@@ -379,6 +386,158 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         }
         tx.commit()
         activeIndex = index
+    }
+
+    private fun showThemePickerSheet() {
+        val dp = resources.displayMetrics.density
+        val screenH = resources.displayMetrics.heightPixels
+        val sheetH = (screenH * 0.90).toInt()
+        val root = findViewById<FrameLayout>(R.id.rootLayout)
+        val prefs = getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+
+        val dim = View(this).apply {
+            setBackgroundColor(Color.argb(170, 0, 0, 0))
+            alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+        root.addView(dim)
+        dim.animate().alpha(1f).setDuration(300).start()
+
+        var selectedId = AppTheme.themes[0].id
+        val themeCards = mutableListOf<LinearLayout>()
+
+        val sheetScroll = ScrollView(this)
+        val sheetContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (16 * dp).toInt(), (20 * dp).toInt(), (32 * dp).toInt())
+        }
+        sheetScroll.addView(sheetContent)
+
+        // Handle
+        sheetContent.addView(FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (24 * dp).toInt())
+            addView(View(this@MainActivity).apply {
+                background = GradientDrawable().apply { cornerRadius = 3 * dp; setColor(Color.argb(80, 255, 255, 255)) }
+                layoutParams = FrameLayout.LayoutParams((44 * dp).toInt(), (4 * dp).toInt(), Gravity.CENTER)
+            })
+        })
+
+        sheetContent.addView(TextView(this).apply {
+            text = "Выберите тему"; textSize = 24f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            setPadding(0, (8 * dp).toInt(), 0, (4 * dp).toInt())
+        })
+        sheetContent.addView(TextView(this).apply {
+            text = "Можно изменить позже в Настройках"; textSize = 13f
+            setTextColor(Color.argb(140, 255, 255, 255))
+            setPadding(0, 0, 0, (20 * dp).toInt())
+        })
+
+        AppTheme.themes.forEachIndexed { i, theme ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt())
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = (10 * dp).toInt()
+                }
+                background = GradientDrawable().apply {
+                    cornerRadius = 16 * dp
+                    setColor(Color.argb(30, 255, 255, 255))
+                    setStroke(1, Color.argb(60, 255, 255, 255))
+                }
+                isClickable = true; isFocusable = true
+            }
+            themeCards.add(card)
+
+            card.addView(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt()).apply { marginEnd = (14 * dp).toInt() }
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(theme.accent)) }
+            })
+
+            val texts = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            texts.addView(TextView(this).apply {
+                text = theme.name; textSize = 17f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.WHITE)
+            })
+            val dotsRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, (4 * dp).toInt(), 0, 0)
+            }
+            listOf(theme.bg, theme.surface, theme.accent, theme.textPrimary).forEach { col ->
+                dotsRow.addView(View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams((12 * dp).toInt(), (12 * dp).toInt()).apply { marginEnd = (4 * dp).toInt() }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        val hex = if (col.length == 9) "#${col.substring(3)}" else col
+                        try { setColor(Color.parseColor(hex)) } catch (_: Exception) { setColor(Color.DKGRAY) }
+                    }
+                })
+            }
+            texts.addView(dotsRow)
+            card.addView(texts)
+
+            val check = TextView(this).apply {
+                text = "✓"; textSize = 18f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor(theme.accent))
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams((32 * dp).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+                visibility = View.INVISIBLE
+            }
+            card.addView(check)
+
+            card.setOnClickListener {
+                selectedId = theme.id
+                themeCards.forEachIndexed { j, c ->
+                    val th = AppTheme.themes[j]
+                    val sel = th.id == selectedId
+                    c.background = GradientDrawable().apply {
+                        cornerRadius = 16 * dp
+                        if (sel) { setColor(hexAlpha(th.accent, 28)); setStroke((2 * dp).toInt(), Color.parseColor(th.accent)) }
+                        else      { setColor(Color.argb(30, 255, 255, 255)); setStroke(1, Color.argb(60, 255, 255, 255)) }
+                    }
+                    val chk = c.getChildAt(c.childCount - 1) as? TextView
+                    chk?.visibility = if (sel) View.VISIBLE else View.INVISIBLE
+                }
+            }
+            sheetContent.addView(card)
+        }
+
+        sheetContent.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (8 * dp).toInt()) })
+
+        var sheet: FrameLayout? = null
+        val startBtn = Button(this).apply {
+            text = "Начать"; textSize = 17f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#111116"))
+            background = GradientDrawable().apply { cornerRadius = 14 * dp; setColor(Color.WHITE) }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (56 * dp).toInt())
+            setOnClickListener {
+                AppTheme.apply(this@MainActivity, selectedId)
+                prefs.edit().putBoolean("theme_chosen", true).apply()
+                val s = sheet ?: return@setOnClickListener
+                s.animate().translationY(sheetH.toFloat()).setDuration(280).withEndAction {
+                    root.removeView(s); root.removeView(dim); recreate()
+                }.start()
+                dim.animate().alpha(0f).setDuration(280).start()
+            }
+        }
+        sheetContent.addView(startBtn)
+
+        sheet = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadii = floatArrayOf(28 * dp, 28 * dp, 28 * dp, 28 * dp, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor("#111116"))
+            }
+            translationY = sheetH.toFloat()
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, sheetH).apply { gravity = Gravity.BOTTOM }
+        }
+        sheet!!.addView(sheetScroll, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        root.addView(sheet)
+        sheet!!.animate().translationY(0f).setDuration(380).setInterpolator(DecelerateInterpolator(2f)).start()
     }
 
     companion object {

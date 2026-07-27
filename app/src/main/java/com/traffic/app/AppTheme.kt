@@ -18,9 +18,9 @@ data class ThemeDef(
 object AppTheme {
     val themes = listOf(
         ThemeDef(
-            "glass", "Стекло", "#1A0E00", "#0AFFFFFF", "#CC2A1500", "#D4A040",
-            textPrimary = "#F2E8D5", textSecondary = "#A07850",
-            cardBorder = "#40FFFFFF", isGlass = true,
+            "glass", "Стекло", "#0B0C14", "#14FFFFFF", "#CC090A12", "#0A84FF",
+            textPrimary = "#FFFFFF", textSecondary = "#8E8E93",
+            cardBorder = "#28FFFFFF", isGlass = true,
         ),
         ThemeDef(
             "glassneon", "Стекло+Неон", "#0A002A", "#1ECC00FF", "#CC0A0025", "#CC00FF",
@@ -43,14 +43,16 @@ object AppTheme {
         private set
 
     fun load(ctx: Context) {
-        val id = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-            .getString("theme_id", "glass") ?: "glass"
-        current = themes.find { it.id == id } ?: themes[0]
+        val prefs = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+        val id = prefs.getString("theme_id", "glass") ?: "glass"
+        val base = themes.find { it.id == id } ?: themes[0]
+        val customAccent = prefs.getString("accent_$id", null)
+        current = if (customAccent != null) base.copy(accent = customAccent) else base
     }
 
     fun apply(ctx: Context, id: String) {
         ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
             .edit().putString("theme_id", id).apply()
-        current = themes.find { it.id == id } ?: themes[0]
+        load(ctx)
     }
 }

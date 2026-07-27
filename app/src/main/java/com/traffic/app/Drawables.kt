@@ -16,7 +16,7 @@ fun bgDrawable(theme: ThemeDef): Drawable {
     if (!theme.isGlass) return ColorDrawable(Color.parseColor(theme.bg))
     val (c1, c2) = when (theme.id) {
         "glassneon" -> Pair("#07001A", "#001407")
-        "glass"     -> Pair("#3A2000", "#100800")
+        "glass"     -> Pair("#0B0C14", "#161728")
         else        -> Pair("#080F28", "#17082E")
     }
     return GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -26,33 +26,51 @@ fun bgDrawable(theme: ThemeDef): Drawable {
 fun cardDrawable(theme: ThemeDef, cornerDp: Float, density: Float): Drawable =
     if (theme.isGlass) {
         val cr = cornerDp * density
-        LayerDrawable(arrayOf(
-            // тёмная прозрачная основа — фон просвечивает сквозь стекло
-            GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
-                setColor(Color.argb(50, 0, 0, 0))
-            },
-            // световой блик сверху — отражение света
-            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
-                Color.argb(90, 255, 255, 255),
-                Color.argb(0,  255, 255, 255),
-            )).apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
-            },
-            // диагональный отблеск TL→BR
-            GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(
-                Color.argb(30, 255, 255, 255),
-                Color.argb(0,  255, 255, 255),
-            )).apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
-            },
-            // яркая светящаяся граница — как на реальном стекле
-            GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
-                setColor(Color.TRANSPARENT)
-                setStroke((2 * density).toInt(), Color.argb(190, 255, 255, 255))
-            },
-        ))
+        if (theme.id == "glass") {
+            // Apple visionOS style — матовое светлое стекло
+            LayerDrawable(arrayOf(
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                    setColor(Color.argb(38, 255, 255, 255))
+                },
+                GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
+                    Color.argb(80, 255, 255, 255),
+                    Color.argb(8,  255, 255, 255),
+                )).apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                },
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                    setColor(Color.TRANSPARENT)
+                    setStroke(1, Color.argb(65, 255, 255, 255))
+                },
+            ))
+        } else {
+            // Dramatic dark glass — тёмное прозрачное с яркой границей
+            LayerDrawable(arrayOf(
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                    setColor(Color.argb(50, 0, 0, 0))
+                },
+                GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
+                    Color.argb(90, 255, 255, 255),
+                    Color.argb(0,  255, 255, 255),
+                )).apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                },
+                GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(
+                    Color.argb(30, 255, 255, 255),
+                    Color.argb(0,  255, 255, 255),
+                )).apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                },
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                    setColor(Color.TRANSPARENT)
+                    setStroke((2 * density).toInt(), Color.argb(190, 255, 255, 255))
+                },
+            ))
+        }
     } else {
         GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE

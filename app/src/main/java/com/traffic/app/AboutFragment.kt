@@ -29,7 +29,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1"
+        const val CURRENT_VERSION = "1.1.3"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -39,7 +39,8 @@ class AboutFragment : Fragment() {
     private lateinit var updateStatus: TextView
     private lateinit var updateBtn: Button
     private lateinit var progressBar: ProgressBar
-    private lateinit var bottomSheet: LinearLayout
+    private var sheetOverlay: View? = null
+    private var storedSheetH = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
@@ -170,84 +171,10 @@ class AboutFragment : Fragment() {
 
         layout.addView(updateCard)
 
-        // ── Плашка снизу ──────────────────────────────────────────────────────
-        val root = android.widget.FrameLayout(ctx).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-            )
+        val root = FrameLayout(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
         root.addView(scroll)
-
-        bottomSheet = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((20 * dp).toInt(), (16 * dp).toInt(), (20 * dp).toInt(), (20 * dp).toInt())
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadii = floatArrayOf(24f * dp, 24f * dp, 24f * dp, 24f * dp, 0f, 0f, 0f, 0f)
-                setColor(Color.parseColor(t.nav))
-                setStroke(1, Color.parseColor(t.cardBorder))
-            }
-            elevation = (16 * dp)
-            visibility = View.GONE
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.BOTTOM }
-        }
-
-        val sheetRow = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, (10 * dp).toInt())
-        }
-        val sheetIcon = TextView(ctx).apply {
-            text = "🆕"; textSize = 22f; gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams((36 * dp).toInt(), (36 * dp).toInt()).apply {
-                marginEnd = (12 * dp).toInt()
-            }
-        }
-        val sheetTexts = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val sheetTitle = TextView(ctx).apply {
-            text = "Доступно обновление"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor(t.accent))
-        }
-        val sheetBody = TextView(ctx).apply {
-            textSize = 13f; setTextColor(Color.parseColor(t.textSecondary))
-        }
-        val sheetClose = TextView(ctx).apply {
-            text = "✕"; textSize = 18f; gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(t.textSecondary))
-            layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt())
-            setOnClickListener { hideBottomSheet() }
-        }
-        sheetTexts.addView(sheetTitle)
-        sheetTexts.addView(sheetBody)
-        sheetRow.addView(sheetIcon)
-        sheetRow.addView(sheetTexts)
-        sheetRow.addView(sheetClose)
-        bottomSheet.addView(sheetRow)
-
-        val sheetBtn = Button(ctx).apply {
-            textSize = 15f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor(t.bg))
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = 12f * dp
-                setColor(Color.parseColor(t.accent))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, (52 * dp).toInt()
-            )
-        }
-        bottomSheet.addView(sheetBtn)
-
-        root.addView(bottomSheet)
-
-        // Сохраняем ссылки для использования в checkForUpdates
-        bottomSheet.tag = Triple(sheetTitle, sheetBody, sheetBtn)
-
         return root
     }
 
@@ -258,36 +185,103 @@ class AboutFragment : Fragment() {
     }
 
     private fun showBottomSheet(version: String, summary: String, actionLabel: String, onAction: () -> Unit) {
-        @Suppress("UNCHECKED_CAST")
-        val tag = bottomSheet.tag as Triple<TextView, TextView, Button>
-        val (title, body, btn) = tag
-        title.text = "Доступно обновление $version"
-        body.text  = summary.lines().firstOrNull { it.isNotBlank() }?.take(80) ?: summary.take(80)
-        btn.text   = actionLabel
-        btn.setOnClickListener { onAction() }
+        if (!isAdded) return
+        hideBottomSheet()
+        val ctx = requireContext()
+        val t = AppTheme.current
+        val dp = ctx.resources.displayMetrics.density
+        val rootView = requireView() as FrameLayout
+        val screenH = ctx.resources.displayMetrics.heightPixels
+        val sheetH = (screenH * 0.82).toInt()
+        storedSheetH = sheetH
 
-        bottomSheet.visibility = View.VISIBLE
-        bottomSheet.measure(
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        )
-        val h = bottomSheet.measuredHeight.toFloat()
-        bottomSheet.translationY = h
-        bottomSheet.animate()
-            .translationY(0f)
-            .setDuration(320)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
+        val dim = View(ctx).apply {
+            setBackgroundColor(Color.argb(170, 0, 0, 0))
+            alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            setOnClickListener { hideBottomSheet() }
+        }
+
+        val sheetContent = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (16 * dp).toInt(), (20 * dp).toInt(), (32 * dp).toInt())
+        }
+
+        sheetContent.addView(FrameLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (24 * dp).toInt())
+            addView(View(ctx).apply {
+                background = GradientDrawable().apply { cornerRadius = 3 * dp; setColor(Color.argb(80, 255, 255, 255)) }
+                layoutParams = FrameLayout.LayoutParams((44 * dp).toInt(), (4 * dp).toInt(), Gravity.CENTER)
+            })
+        })
+        sheetContent.addView(TextView(ctx).apply {
+            text = "🆕  Обновление $version"; textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.accent))
+            setPadding(0, (8 * dp).toInt(), 0, (4 * dp).toInt())
+        })
+        sheetContent.addView(TextView(ctx).apply {
+            text = "Доступна новая версия приложения"; textSize = 13f
+            setTextColor(Color.argb(140, 255, 255, 255))
+            setPadding(0, 0, 0, (16 * dp).toInt())
+        })
+
+        val notesScroll = ScrollView(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        }
+        notesScroll.addView(TextView(ctx).apply {
+            text = summary; textSize = 14f
+            setLineSpacing(0f, 1.5f)
+            setTextColor(Color.parseColor(t.textPrimary))
+        })
+        sheetContent.addView(notesScroll)
+
+        sheetContent.addView(Button(ctx).apply {
+            text = actionLabel; textSize = 17f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.bg))
+            background = GradientDrawable().apply { cornerRadius = 14 * dp; setColor(Color.parseColor(t.accent)) }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (56 * dp).toInt()).apply {
+                topMargin = (14 * dp).toInt()
+            }
+            setOnClickListener { onAction(); hideBottomSheet() }
+        })
+
+        val sheetPanel = FrameLayout(ctx).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadii = floatArrayOf(28 * dp, 28 * dp, 28 * dp, 28 * dp, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor("#111116"))
+            }
+            translationY = sheetH.toFloat()
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, sheetH).apply {
+                gravity = Gravity.BOTTOM
+            }
+        }
+        sheetPanel.addView(sheetContent, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        val overlay = FrameLayout(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+        overlay.addView(dim)
+        overlay.addView(sheetPanel)
+
+        rootView.addView(overlay)
+        sheetOverlay = overlay
+
+        dim.animate().alpha(1f).setDuration(300).start()
+        sheetPanel.animate().translationY(0f).setDuration(380).setInterpolator(DecelerateInterpolator(2f)).start()
     }
 
     private fun hideBottomSheet() {
-        val h = bottomSheet.height.toFloat()
-        bottomSheet.animate()
-            .translationY(h)
-            .setDuration(260)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction { bottomSheet.visibility = View.GONE }
-            .start()
+        val overlay = sheetOverlay ?: return
+        val rootView = requireView() as? FrameLayout ?: return
+        val sheetPanel = (overlay as FrameLayout).getChildAt(1) ?: return
+        val dim = overlay.getChildAt(0)
+        val h = storedSheetH.toFloat()
+        sheetPanel.animate().translationY(h).setDuration(280).withEndAction {
+            if (isAdded) rootView.removeView(overlay)
+            sheetOverlay = null
+        }.start()
+        dim?.animate()?.alpha(0f)?.setDuration(280)?.start()
     }
 
     private fun checkForUpdates(ctx: Context, dp: Float) {
