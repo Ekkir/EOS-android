@@ -1,0 +1,74 @@
+package com.traffic.app
+
+import android.content.Context
+import android.graphics.Color
+import android.graphics.Outline
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.view.View
+import android.view.ViewOutlineProvider
+import android.widget.ImageView
+import android.widget.LinearLayout
+
+fun cardDrawable(theme: ThemeDef, cornerDp: Float, density: Float): Drawable =
+    if (theme.isGlass) {
+        val cr = cornerDp * density
+        LayerDrawable(arrayOf(
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                setColor(Color.parseColor(theme.surface))
+            },
+            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
+                Color.argb(100, 255, 255, 255),
+                Color.argb(4, 255, 255, 255),
+            )).apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+            },
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+                setColor(Color.TRANSPARENT)
+                setStroke(2, Color.parseColor(theme.cardBorder))
+            },
+        ))
+    } else {
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = cornerDp * density
+            setColor(Color.parseColor(theme.surface))
+            setStroke(2, Color.parseColor(theme.cardBorder))
+        }
+    }
+
+fun hexAlpha(hex: String, alpha: Int): Int {
+    val c = Color.parseColor(hex)
+    return Color.argb(alpha, Color.red(c), Color.green(c), Color.blue(c))
+}
+
+fun statusBarHeight(ctx: Context): Int {
+    val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
+    return if (id > 0) ctx.resources.getDimensionPixelSize(id) else 0
+}
+
+fun miniAvatarView(ctx: Context, dp: Float, theme: ThemeDef, onTap: () -> Unit): ImageView {
+    val size = (36 * dp).toInt()
+    return ImageView(ctx).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        clipToOutline = true
+        outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(v: View, outline: Outline) { outline.setOval(0, 0, v.width, v.height) }
+        }
+        background = ColorDrawable(hexAlpha(theme.accent, 30))
+        layoutParams = LinearLayout.LayoutParams(size, size)
+        MainActivity.loadAvatarBitmap(ctx)?.let { setImageBitmap(it) }
+        setOnClickListener { onTap() }
+    }
+}
+
+fun accentBox(theme: ThemeDef, density: Float, cornerDp: Float = 8f): GradientDrawable =
+    GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = cornerDp * density
+        setColor(hexAlpha(theme.accent, 30))
+    }
