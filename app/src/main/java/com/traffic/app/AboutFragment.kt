@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
@@ -38,6 +39,7 @@ class AboutFragment : Fragment() {
     private lateinit var updateStatus: TextView
     private lateinit var updateBtn: Button
     private lateinit var progressBar: ProgressBar
+    private lateinit var bottomSheet: LinearLayout
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
@@ -168,13 +170,124 @@ class AboutFragment : Fragment() {
 
         layout.addView(updateCard)
 
-        return scroll
+        // ── Плашка снизу ──────────────────────────────────────────────────────
+        val root = android.widget.FrameLayout(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        root.addView(scroll)
+
+        bottomSheet = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (16 * dp).toInt(), (20 * dp).toInt(), (20 * dp).toInt())
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadii = floatArrayOf(24f * dp, 24f * dp, 24f * dp, 24f * dp, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor(t.nav))
+                setStroke(1, Color.parseColor(t.cardBorder))
+            }
+            elevation = (16 * dp)
+            visibility = View.GONE
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.BOTTOM }
+        }
+
+        val sheetRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, (10 * dp).toInt())
+        }
+        val sheetIcon = TextView(ctx).apply {
+            text = "🆕"; textSize = 22f; gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams((36 * dp).toInt(), (36 * dp).toInt()).apply {
+                marginEnd = (12 * dp).toInt()
+            }
+        }
+        val sheetTexts = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val sheetTitle = TextView(ctx).apply {
+            text = "Доступно обновление"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.accent))
+        }
+        val sheetBody = TextView(ctx).apply {
+            textSize = 13f; setTextColor(Color.parseColor(t.textSecondary))
+        }
+        val sheetClose = TextView(ctx).apply {
+            text = "✕"; textSize = 18f; gravity = Gravity.CENTER
+            setTextColor(Color.parseColor(t.textSecondary))
+            layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt())
+            setOnClickListener { hideBottomSheet() }
+        }
+        sheetTexts.addView(sheetTitle)
+        sheetTexts.addView(sheetBody)
+        sheetRow.addView(sheetIcon)
+        sheetRow.addView(sheetTexts)
+        sheetRow.addView(sheetClose)
+        bottomSheet.addView(sheetRow)
+
+        val sheetBtn = Button(ctx).apply {
+            textSize = 15f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.bg))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = 12f * dp
+                setColor(Color.parseColor(t.accent))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (52 * dp).toInt()
+            )
+        }
+        bottomSheet.addView(sheetBtn)
+
+        root.addView(bottomSheet)
+
+        // Сохраняем ссылки для использования в checkForUpdates
+        bottomSheet.tag = Triple(sheetTitle, sheetBody, sheetBtn)
+
+        return root
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
         handler.removeCallbacksAndMessages(null)
         executor.shutdown()
+    }
+
+    private fun showBottomSheet(version: String, summary: String, actionLabel: String, onAction: () -> Unit) {
+        @Suppress("UNCHECKED_CAST")
+        val tag = bottomSheet.tag as Triple<TextView, TextView, Button>
+        val (title, body, btn) = tag
+        title.text = "Доступно обновление $version"
+        body.text  = summary.lines().firstOrNull { it.isNotBlank() }?.take(80) ?: summary.take(80)
+        btn.text   = actionLabel
+        btn.setOnClickListener { onAction() }
+
+        bottomSheet.visibility = View.VISIBLE
+        bottomSheet.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val h = bottomSheet.measuredHeight.toFloat()
+        bottomSheet.translationY = h
+        bottomSheet.animate()
+            .translationY(0f)
+            .setDuration(320)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+    }
+
+    private fun hideBottomSheet() {
+        val h = bottomSheet.height.toFloat()
+        bottomSheet.animate()
+            .translationY(h)
+            .setDuration(260)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction { bottomSheet.visibility = View.GONE }
+            .start()
     }
 
     private fun checkForUpdates(ctx: Context, dp: Float) {
@@ -244,10 +357,17 @@ class AboutFragment : Fragment() {
                             updateBtn.isEnabled = true
                             updateBtn.text = "Скачать и установить"
                             updateBtn.setOnClickListener { downloadAndInstall(ctx, finalUrl, finalSize, dp) }
+                            showBottomSheet(finalTag, finalBody, "Скачать") {
+                                downloadAndInstall(ctx, finalUrl, finalSize, dp)
+                            }
                         } else {
                             updateBtn.isEnabled = true
                             updateBtn.text = "Открыть страницу релиза"
                             updateBtn.setOnClickListener {
+                                startActivity(Intent(Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest")))
+                            }
+                            showBottomSheet(finalTag, finalBody, "Открыть") {
                                 startActivity(Intent(Intent.ACTION_VIEW,
                                     Uri.parse("https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest")))
                             }
