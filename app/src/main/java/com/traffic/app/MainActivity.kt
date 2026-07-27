@@ -363,10 +363,10 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
     }
 
     fun showTab(index: Int) {
-        if (supportFragmentManager.findFragmentByTag("profile") != null ||
-            supportFragmentManager.findFragmentByTag("messenger") != null) {
-            supportFragmentManager.popBackStack()
+        while (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStackImmediate()
         }
+        showMainChrome()
         val fm = supportFragmentManager
         val tx = fm.beginTransaction()
         sections.forEach { s -> fm.findFragmentByTag(s.id)?.let { tx.hide(it) } }
