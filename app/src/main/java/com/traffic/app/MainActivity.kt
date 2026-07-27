@@ -11,12 +11,17 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.work.*
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.TimeUnit
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -67,6 +72,7 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
             showThemePickerSheet()
         }
         scheduleUpdateCheck()
+        checkForUpdatesOnStart()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
@@ -396,6 +402,135 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         }
         tx.commit()
         activeIndex = index
+    }
+
+    private fun checkForUpdatesOnStart() {
+        val prefs = getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("theme_chosen", false)) return
+        val handler = Handler(Looper.getMainLooper())
+        Thread {
+            try {
+                val url = "https://api.github.com/repos/${AboutFragment.GITHUB_OWNER}/${AboutFragment.GITHUB_REPO}/releases/latest"
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                conn.connectTimeout = 8000; conn.readTimeout = 8000
+                if (conn.responseCode == 404) { conn.disconnect(); return@Thread }
+                val json = JSONObject(conn.inputStream.bufferedReader().readText())
+                conn.disconnect()
+                val tagName = json.getString("tag_name").trimStart('v', 'V')
+                val body    = json.optString("body", "")
+                val assets  = json.optJSONArray("assets")
+                var apkUrl  = ""
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val a = assets.getJSONObject(i)
+                        if (a.getString("name").endsWith(".apk")) { apkUrl = a.getString("browser_download_url"); break }
+                    }
+                }
+                if (isNewerVersion(tagName, AboutFragment.CURRENT_VERSION)) {
+                    val finalUrl = apkUrl; val finalBody = body; val finalTag = tagName
+                    handler.post { showUpdateSheet(finalTag, finalBody, finalUrl) }
+                }
+            } catch (_: Exception) {}
+        }.start()
+    }
+
+    private fun isNewerVersion(remote: String, current: String): Boolean {
+        val r = remote.split(".").mapNotNull { it.trim().toIntOrNull() }
+        val c = current.split(".").mapNotNull { it.trim().toIntOrNull() }
+        for (i in 0 until maxOf(r.size, c.size)) {
+            val rv = r.getOrElse(i) { 0 }; val cv = c.getOrElse(i) { 0 }
+            if (rv > cv) return true; if (rv < cv) return false
+        }
+        return false
+    }
+
+    private fun showUpdateSheet(version: String, body: String, apkUrl: String) {
+        val dp = resources.displayMetrics.density
+        val screenH = resources.displayMetrics.heightPixels
+        val sheetH = (screenH * 0.82).toInt()
+        val root = findViewById<FrameLayout>(R.id.rootLayout)
+        val t = AppTheme.current
+
+        val dim = View(this).apply {
+            setBackgroundColor(Color.argb(170, 0, 0, 0)); alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+        root.addView(dim)
+        dim.animate().alpha(1f).setDuration(300).start()
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (16 * dp).toInt(), (20 * dp).toInt(), (32 * dp).toInt())
+        }
+
+        // Handle
+        content.addView(FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (24 * dp).toInt())
+            addView(View(this@MainActivity).apply {
+                background = GradientDrawable().apply { cornerRadius = 3 * dp; setColor(Color.argb(80, 255, 255, 255)) }
+                layoutParams = FrameLayout.LayoutParams((44 * dp).toInt(), (4 * dp).toInt(), Gravity.CENTER)
+            })
+        })
+        content.addView(TextView(this).apply {
+            text = "🆕  Обновление v$version"; textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.accent))
+            setPadding(0, (8 * dp).toInt(), 0, (4 * dp).toInt())
+        })
+        content.addView(TextView(this).apply {
+            text = "Доступна новая версия приложения"; textSize = 13f
+            setTextColor(Color.argb(140, 255, 255, 255))
+            setPadding(0, 0, 0, (16 * dp).toInt())
+        })
+
+        val notesScroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        }
+        notesScroll.addView(TextView(this).apply {
+            text = body.ifBlank { "Нет описания" }; textSize = 14f
+            setTextColor(Color.parseColor(t.textPrimary))
+        })
+        content.addView(notesScroll)
+
+        var sheetRef: FrameLayout? = null
+        content.addView(Button(this).apply {
+            text = if (apkUrl.isNotEmpty()) "Скачать и установить" else "Открыть обновление"
+            textSize = 17f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.bg))
+            background = GradientDrawable().apply { cornerRadius = 14 * dp; setColor(Color.parseColor(t.accent)) }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (56 * dp).toInt()).apply {
+                topMargin = (14 * dp).toInt()
+            }
+            setOnClickListener {
+                val s = sheetRef ?: return@setOnClickListener
+                s.animate().translationY(sheetH.toFloat()).setDuration(280).withEndAction {
+                    root.removeView(dim); root.removeView(s)
+                }.start()
+                dim.animate().alpha(0f).setDuration(280).start()
+                openAbout()
+            }
+        })
+
+        val sheet = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadii = floatArrayOf(28 * dp, 28 * dp, 28 * dp, 28 * dp, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor("#111116"))
+            }
+            translationY = sheetH.toFloat()
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, sheetH).apply { gravity = Gravity.BOTTOM }
+        }
+        sheetRef = sheet
+        sheet.addView(content, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        root.addView(sheet)
+
+        dim.setOnClickListener {
+            sheet.animate().translationY(sheetH.toFloat()).setDuration(280).withEndAction {
+                root.removeView(dim); root.removeView(sheet)
+            }.start()
+            dim.animate().alpha(0f).setDuration(280).start()
+        }
+        sheet.animate().translationY(0f).setDuration(380).setInterpolator(DecelerateInterpolator(2f)).start()
     }
 
     private fun scheduleUpdateCheck() {
