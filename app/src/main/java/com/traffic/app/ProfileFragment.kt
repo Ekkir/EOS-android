@@ -37,7 +37,7 @@ class ProfileFragment : Fragment() {
         val t   = AppTheme.current
         val dp  = ctx.resources.displayMetrics.density
 
-        val scroll = ScrollView(ctx).apply { setBackgroundColor(Color.parseColor(t.bg)) }
+        val scroll = ScrollView(ctx).apply { background = bgDrawable(t) }
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((20 * dp).toInt(), (24 * dp).toInt() + statusBarHeight(ctx), (20 * dp).toInt(), (48 * dp).toInt())

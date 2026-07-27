@@ -24,6 +24,12 @@ import java.util.concurrent.Executors
 
 class CalibrationFragment : Fragment() {
 
+    companion object {
+        fun newTabbed(tab: Int) = CalibrationFragment().apply {
+            arguments = Bundle().apply { putInt("initial_tab", tab) }
+        }
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
     private val handler  = Handler(Looper.getMainLooper())
     private val prefs    get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
@@ -53,7 +59,7 @@ class CalibrationFragment : Fragment() {
 
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(t.bg))
+            background = bgDrawable(t)
         }
 
         // ── Tab bar ─────────────────────────────────────────────────────────────
@@ -88,7 +94,7 @@ class CalibrationFragment : Fragment() {
 
         tabTraffic.setOnClickListener { switchTab(0) }
         tabMain.setOnClickListener    { switchTab(1) }
-        switchTab(0)
+        switchTab(arguments?.getInt("initial_tab", 0) ?: 0)
 
         loadConfig()
         return root
@@ -110,7 +116,7 @@ class CalibrationFragment : Fragment() {
 
     // ── Светофоры ─────────────────────────────────────────────────────────────
     private fun buildTrafficContent(ctx: Context, t: ThemeDef, dp: Float): ScrollView {
-        val scroll = ScrollView(ctx).apply { setBackgroundColor(Color.parseColor(t.bg)) }
+        val scroll = ScrollView(ctx).apply { if (!t.isGlass) setBackgroundColor(Color.parseColor(t.bg)) }
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((20 * dp).toInt(), (24 * dp).toInt(), (20 * dp).toInt(), (48 * dp).toInt())
@@ -175,7 +181,7 @@ class CalibrationFragment : Fragment() {
 
     // ── Основное ──────────────────────────────────────────────────────────────
     private fun buildMainContent(ctx: Context, t: ThemeDef, dp: Float): ScrollView {
-        val scroll = ScrollView(ctx).apply { setBackgroundColor(Color.parseColor(t.bg)) }
+        val scroll = ScrollView(ctx).apply { if (!t.isGlass) setBackgroundColor(Color.parseColor(t.bg)) }
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((20 * dp).toInt(), (24 * dp).toInt(), (20 * dp).toInt(), (48 * dp).toInt())

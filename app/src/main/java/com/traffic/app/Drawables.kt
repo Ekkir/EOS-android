@@ -12,24 +12,42 @@ import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.LinearLayout
 
+fun bgDrawable(theme: ThemeDef): Drawable {
+    if (!theme.isGlass) return ColorDrawable(Color.parseColor(theme.bg))
+    val (c1, c2) = if (theme.id == "glassneon")
+        Pair("#07001A", "#001407") else Pair("#080F28", "#17082E")
+    return GradientDrawable(GradientDrawable.Orientation.TL_BR,
+        intArrayOf(Color.parseColor(c1), Color.parseColor(c2)))
+}
+
 fun cardDrawable(theme: ThemeDef, cornerDp: Float, density: Float): Drawable =
     if (theme.isGlass) {
         val cr = cornerDp * density
         LayerDrawable(arrayOf(
+            // матовая белая база
             GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE; cornerRadius = cr
-                setColor(Color.parseColor(theme.surface))
+                setColor(Color.argb(30, 255, 255, 255))
             },
+            // блик сверху вниз
             GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
-                Color.argb(100, 255, 255, 255),
-                Color.argb(4, 255, 255, 255),
+                Color.argb(70, 255, 255, 255),
+                Color.argb(5,  255, 255, 255),
             )).apply {
                 shape = GradientDrawable.RECTANGLE; cornerRadius = cr
             },
+            // тонкий бок-блик слева
+            GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
+                Color.argb(20, 255, 255, 255),
+                Color.argb(0,  255, 255, 255),
+            )).apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = cr
+            },
+            // белая рамка — светопреломление
             GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE; cornerRadius = cr
                 setColor(Color.TRANSPARENT)
-                setStroke(2, Color.parseColor(theme.cardBorder))
+                setStroke(1, Color.argb(115, 255, 255, 255))
             },
         ))
     } else {

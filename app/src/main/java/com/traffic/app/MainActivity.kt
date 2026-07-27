@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         Section("traffic", "🚦", "Светофоры") { TrafficFragment() },
         Section("map",     "🗺",  "Карта")     { MapFragment() },
         Section("cameras", "📷", "Камеры")    { PlaceholderFragment.new("📷", "Камеры") },
-        Section("calib",   "🔧", "Настройки") { CalibrationFragment() },
+        Section("calib",   "⚙️", "Настройки") { SettingsFragment() },
     )
 
     private var activeIndex = 0
@@ -49,8 +49,8 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
         drawerLayout = findViewById(R.id.drawerLayout)
 
         val t = AppTheme.current
-        findViewById<LinearLayout>(R.id.appHeader).setBackgroundColor(Color.parseColor(t.bg))
-        findViewById<FrameLayout>(R.id.rootLayout).setBackgroundColor(Color.parseColor(t.bg))
+        findViewById<LinearLayout>(R.id.appHeader).setBackgroundColor(Color.parseColor(t.nav))
+        findViewById<FrameLayout>(R.id.rootLayout).background = bgDrawable(t)
 
         buildHeader()
         buildDrawer()
@@ -308,7 +308,7 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
 
     fun openDrawer() = drawerLayout.openDrawer(GravityCompat.START)
 
-    private fun hideMainChrome() {
+    fun hideMainChrome() {
         findViewById<View>(R.id.appHeader).visibility = View.GONE
         avatarView.visibility = View.GONE
     }

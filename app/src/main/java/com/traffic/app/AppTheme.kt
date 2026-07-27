@@ -18,13 +18,13 @@ data class ThemeDef(
 object AppTheme {
     val themes = listOf(
         ThemeDef(
-            "glass", "Стекло", "#04091C", "#16FFFFFF", "#020711", "#56D4FF",
-            textPrimary = "#E8F4FF", textSecondary = "#8AADCC",
-            cardBorder = "#38FFFFFF", isGlass = true,
+            "glass", "Стекло", "#0A1428", "#1EFFFFFF", "#CC0D1A36", "#56D4FF",
+            textPrimary = "#EDF6FF", textSecondary = "#7BAFC8",
+            cardBorder = "#48FFFFFF", isGlass = true,
         ),
         ThemeDef(
-            "glassneon", "Стекло+Неон", "#030010", "#186600FF", "#010008", "#CC00FF",
-            textPrimary = "#F2EAFF", textSecondary = "#AA88CC",
+            "glassneon", "Стекло+Неон", "#0A002A", "#1ECC00FF", "#CC0A0025", "#CC00FF",
+            textPrimary = "#F2E8FF", textSecondary = "#9A70BB",
             cardBorder = "#55CC00FF", isGlass = true,
         ),
         ThemeDef(

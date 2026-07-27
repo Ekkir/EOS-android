@@ -56,14 +56,14 @@ class MessengerFragment : Fragment() {
 
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(t.bg))
+            background = bgDrawable(t)
         }
 
         // ── Шапка ────────────────────────────────────────────────
         val header = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor(t.bg))
+            setBackgroundColor(Color.parseColor(t.nav))
             setPadding((12 * dp).toInt(), (12 * dp).toInt() + statusBarHeight(ctx), (16 * dp).toInt(), (12 * dp).toInt())
             elevation = (4 * dp)
         }

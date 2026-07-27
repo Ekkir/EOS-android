@@ -55,7 +55,7 @@ class TrafficFragment : Fragment() {
         // Корневой LinearLayout (вертикальный): карта + нижняя панель
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(t.bg))
+            background = bgDrawable(t)
         }
 
         // RoadMapView — занимает всё свободное пространство
