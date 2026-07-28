@@ -4,18 +4,60 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'theme/app_theme.dart';
 import 'services/prefs_service.dart';
 import 'services/api_service.dart';
+import 'services/update_service.dart';
 import 'screens/home_screen.dart';
 
 final FlutterLocalNotificationsPlugin _localNotif = FlutterLocalNotificationsPlugin();
+
+// ── Workmanager background entry point ──────────────────────────────────────
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((taskName, _) async {
+    if (taskName != UpdateService.taskName) return true;
+    try {
+      final latest = await UpdateService.fetchLatestVersion();
+      if (latest == null) return true;
+      if (!UpdateService.isNewer(latest, UpdateService.currentVersion)) return true;
+
+      final notif = FlutterLocalNotificationsPlugin();
+      await notif.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        ),
+      );
+      await notif.show(
+        42,
+        'Доступно обновление EOS',
+        'Версия $latest — откройте приложение для установки',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            UpdateService.notifChannelId,
+            UpdateService.notifChannelName,
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+            icon: '@mipmap/ic_launcher',
+          ),
+        ),
+      );
+    } catch (_) {}
+    return true;
+  });
+}
+
+// ── FCM background handler ───────────────────────────────────────────────────
 
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {
   await Firebase.initializeApp();
 }
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,20 +65,28 @@ Future<void> main() async {
 
   await Firebase.initializeApp();
 
+  // Local notifications setup
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
   await _localNotif.initialize(
     const InitializationSettings(android: androidSettings),
   );
 
-  const channel = AndroidNotificationChannel(
+  // Create notification channels
+  final androidPlugin = _localNotif
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
     'eos_chat', 'Чат',
     description: 'Сообщения из чатов EOS',
     importance: Importance.high,
-  );
-  await _localNotif
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
+  ));
+  await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+    UpdateService.notifChannelId,
+    UpdateService.notifChannelName,
+    description: 'Уведомления о новых версиях EOS',
+    importance: Importance.defaultImportance,
+  ));
 
+  // FCM
   FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
   FirebaseMessaging.onMessage.listen((msg) {
     final title = msg.notification?.title ?? msg.data['sender'] ?? 'EOS';
@@ -51,6 +101,18 @@ Future<void> main() async {
       ),
     );
   });
+
+  // Workmanager: hourly update check
+  await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+  await Workmanager().registerPeriodicTask(
+    UpdateService.taskName,
+    UpdateService.taskName,
+    frequency: const Duration(hours: 1),
+    constraints: Constraints(networkType: NetworkType.connected),
+    existingWorkPolicy: ExistingWorkPolicy.keep,
+    backoffPolicy: BackoffPolicy.linear,
+    backoffPolicyDelay: const Duration(minutes: 15),
+  );
 
   final prefs = PrefsService();
   await prefs.init();
@@ -80,9 +142,7 @@ void _registerFcmToken(PrefsService prefs) async {
     if (token != null && token.isNotEmpty) {
       await prefs.setFcmToken(token);
       final sender = prefs.profileName;
-      if (sender.isNotEmpty) {
-        await ApiService(prefs).registerFcmToken(sender, token);
-      }
+      if (sender.isNotEmpty) await ApiService(prefs).registerFcmToken(sender, token);
     }
     FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
       await prefs.setFcmToken(t);

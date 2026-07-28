@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/update_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/circular_avatar.dart';
 
@@ -17,9 +17,7 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen>
     with SingleTickerProviderStateMixin {
-  static const _currentVersion = '1.1.21';
   static const _githubRepo = 'https://github.com/Ekkir/EOS-android';
-  static const _releasesApi = 'https://api.github.com/repos/Ekkir/EOS-android/releases/latest';
 
   Uint8List? _creatorAvatar;
   bool _loadingAvatar = true;
@@ -59,47 +57,15 @@ class _AboutScreenState extends State<AboutScreen>
 
   Future<void> _checkUpdate() async {
     setState(() { _checkingUpdate = true; _updateAvailable = null; });
-    try {
-      final version = await _fetchLatestVersion();
-      if (mounted) {
-        setState(() {
-          _latestVersion = version;
-          _updateAvailable = version != null && _isNewer(version, _currentVersion);
-          _checkingUpdate = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() { _checkingUpdate = false; });
+    final version = await UpdateService.fetchLatestVersion();
+    if (mounted) {
+      setState(() {
+        _latestVersion = version;
+        _updateAvailable = version != null &&
+            UpdateService.isNewer(version, UpdateService.currentVersion);
+        _checkingUpdate = false;
+      });
     }
-  }
-
-  Future<String?> _fetchLatestVersion() async {
-    try {
-      final client = HttpClient();
-      final req = await client.getUrl(Uri.parse(_releasesApi));
-      req.headers.set('User-Agent', 'EOS-App');
-      req.headers.set('Accept', 'application/vnd.github+json');
-      final resp = await req.close().timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200) {
-        final body = await resp.transform(const SystemEncoding().decoder).join();
-        final json = body;
-        final match = RegExp(r'"tag_name"\s*:\s*"([^"]+)"').firstMatch(json);
-        client.close();
-        return match?.group(1);
-      }
-      client.close();
-    } catch (_) {}
-    return null;
-  }
-
-  bool _isNewer(String remote, String local) {
-    final r = remote.replaceFirst('v', '').split('.').map(int.parse).toList();
-    final l = local.split('.').map(int.parse).toList();
-    for (var i = 0; i < 3; i++) {
-      if ((r.length > i ? r[i] : 0) > (l.length > i ? l[i] : 0)) return true;
-      if ((r.length > i ? r[i] : 0) < (l.length > i ? l[i] : 0)) return false;
-    }
-    return false;
   }
 
   Future<void> _openGithub() async {
@@ -115,7 +81,8 @@ class _AboutScreenState extends State<AboutScreen>
       backgroundColor: t.bg,
       appBar: AppBar(
         backgroundColor: t.nav,
-        title: Text('О приложении', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text('О приложении',
+            style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: SingleChildScrollView(
@@ -123,24 +90,23 @@ class _AboutScreenState extends State<AboutScreen>
         child: Column(
           children: [
             const SizedBox(height: 16),
-            // Logo with shimmer
+
+            // Logo shimmer
             AnimatedBuilder(
               animation: _shimmerAnim,
-              builder: (ctx, child) {
-                return ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
-                    begin: Alignment(_shimmerAnim.value - 1, 0),
-                    end: Alignment(_shimmerAnim.value, 0),
-                    colors: [
-                      t.accent.withValues(alpha: 0.4),
-                      t.accent,
-                      t.accent.withValues(alpha: 0.4),
-                    ],
-                  ).createShader(bounds),
-                  child: child,
-                );
-              },
-              child: Text('EOS',
+              builder: (ctx, child) => ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  begin: Alignment(_shimmerAnim.value - 1, 0),
+                  end: Alignment(_shimmerAnim.value, 0),
+                  colors: [
+                    t.accent.withValues(alpha: 0.4),
+                    t.accent,
+                    t.accent.withValues(alpha: 0.4),
+                  ],
+                ).createShader(bounds),
+                child: child,
+              ),
+              child: const Text('EOS',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 64,
@@ -156,7 +122,7 @@ class _AboutScreenState extends State<AboutScreen>
             ),
             const SizedBox(height: 24),
 
-            // Version card
+            // Version + update check
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -167,8 +133,9 @@ class _AboutScreenState extends State<AboutScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Версия', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                      Text(_currentVersion,
-                        style: TextStyle(color: t.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(UpdateService.currentVersion,
+                        style: TextStyle(color: t.textPrimary, fontSize: 18,
+                            fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const Spacer(),
@@ -201,7 +168,8 @@ class _AboutScreenState extends State<AboutScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Доступна версия $_latestVersion',
-                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            style: const TextStyle(color: Colors.green,
+                                fontWeight: FontWeight.bold)),
                           Text('Нажмите, чтобы скачать',
                             style: TextStyle(color: Colors.green.shade300, fontSize: 12)),
                         ],
@@ -229,9 +197,27 @@ class _AboutScreenState extends State<AboutScreen>
               ),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
-            // Creator card
+            // Info cards
+            GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                children: [
+                  _InfoRow(icon: Icons.code, label: 'Язык', value: 'Dart / Flutter', t: t),
+                  Divider(color: t.cardBorder, height: 16),
+                  _InfoRow(icon: Icons.phone_android, label: 'Платформа', value: 'Android', t: t),
+                  Divider(color: t.cardBorder, height: 16),
+                  _InfoRow(icon: Icons.map, label: 'Карта', value: 'OpenStreetMap', t: t),
+                  Divider(color: t.cardBorder, height: 16),
+                  _InfoRow(icon: Icons.notifications, label: 'Push', value: 'Firebase FCM', t: t),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Creator
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -242,18 +228,15 @@ class _AboutScreenState extends State<AboutScreen>
                           backgroundColor: t.surface,
                           child: CircularProgressIndicator(color: t.accent, strokeWidth: 2),
                         )
-                      : CircularAvatar(
-                          bytes: _creatorAvatar,
-                          name: 'Ekkir',
-                          radius: 28,
-                        ),
+                      : CircularAvatar(bytes: _creatorAvatar, name: 'Ekkir', radius: 28),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Ekkir',
-                          style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                          style: TextStyle(color: t.textPrimary,
+                              fontWeight: FontWeight.bold, fontSize: 16)),
                         Text('Разработчик',
                           style: TextStyle(color: t.textSecondary, fontSize: 13)),
                       ],
@@ -266,18 +249,17 @@ class _AboutScreenState extends State<AboutScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // Links
             GlassCard(
               onTap: _openGithub,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Icon(Icons.code, color: t.accent),
+                  Icon(Icons.source, color: t.accent),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text('GitHub репозиторий',
+                    child: Text('Исходный код на GitHub',
                       style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w500)),
                   ),
                   Icon(Icons.chevron_right, color: t.textSecondary),
@@ -287,6 +269,29 @@ class _AboutScreenState extends State<AboutScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final ThemeDef t;
+
+  const _InfoRow({required this.icon, required this.label, required this.value, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: t.accent, size: 18),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(color: t.textSecondary, fontSize: 14)),
+        const Spacer(),
+        Text(value,
+          style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+      ],
     );
   }
 }
