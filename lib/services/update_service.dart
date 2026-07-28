@@ -1,7 +1,7 @@
 import 'dart:io';
 
 class UpdateService {
-  static const currentVersion = '1.1.21';
+  static const currentVersion = '1.1.22';
   static const taskName = 'eos_update_check';
   static const notifChannelId = 'eos_updates';
   static const notifChannelName = 'Обновления';
