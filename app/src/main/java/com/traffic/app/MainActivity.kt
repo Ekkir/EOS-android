@@ -351,11 +351,11 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
     }
 
     fun openMessenger() {
-        if (supportFragmentManager.findFragmentByTag("messenger") != null) return
+        if (supportFragmentManager.findFragmentByTag("chatlist") != null) return
         hideMainChrome()
         supportFragmentManager.beginTransaction()
-            .add(R.id.fragmentContainer, MessengerFragment(), "messenger")
-            .addToBackStack("messenger")
+            .add(R.id.fragmentContainer, ChatListFragment(), "chatlist")
+            .addToBackStack("chatlist")
             .commit()
     }
 
@@ -446,6 +446,10 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
     }
 
     private fun showUpdateSheet(version: String, body: String, apkUrl: String) {
+        val aboutVisible = supportFragmentManager.findFragmentByTag("about")?.isVisible == true
+            || supportFragmentManager.findFragmentByTag("about_settings")?.isVisible == true
+        if (aboutVisible) return
+
         val dp = resources.displayMetrics.density
         val screenH = resources.displayMetrics.heightPixels
         val sheetH = (screenH * 0.82).toInt()

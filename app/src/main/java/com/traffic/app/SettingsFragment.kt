@@ -24,6 +24,10 @@ import java.util.concurrent.Executors
 
 class SettingsFragment : Fragment() {
 
+    companion object {
+        var adminUnlocked = false
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
     private val handler  = Handler(Looper.getMainLooper())
 
@@ -131,6 +135,8 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showAdminPasswordDialog(ctx: Context, t: ThemeDef, dp: Float) {
+        if (adminUnlocked) { openFragment(AdminFragment(), "admin"); return }
+
         val serverUrl = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
             .getString("server_url", "http://eos-traffic.ddns.net:5000")!!
 
@@ -173,6 +179,7 @@ class SettingsFragment : Fragment() {
                             handler.post {
                                 if (!isAdded) return@post
                                 if (code == 200) {
+                                    adminUnlocked = true
                                     dialog.dismiss()
                                     openFragment(AdminFragment(), "admin")
                                 } else {

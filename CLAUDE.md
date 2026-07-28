@@ -101,6 +101,15 @@
 - В `CalibrationFragment`: `renderRoads()` всегда пересоздаёт `redDisplays[key]`; EditText открепляется от старого родителя перед переиспользованием; `handler.post` блоки начинаются с `if (!isAdded) return@post`
 - `DrawerLayout` — из `appcompat:1.6.1`, дополнительная зависимость не нужна
 
+## GitHub Release (PowerShell)
+- Кириллица в теле запроса через PowerShell 5.1 превращается в вопросики если передавать строку напрямую
+- Всегда передавать тело как UTF-8 байты:
+  ```powershell
+  $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonString)
+  Invoke-RestMethod ... -Body $bodyBytes -ContentType "application/json; charset=utf-8"
+  ```
+- JSON составлять вручную (не через `ConvertTo-Json`) для контроля над экранированием
+
 ## Иконка приложения
 - Генерируется скриптом: `C:\Users\razzo\AppData\Local\Temp\claude\...\scratchpad\gen_icon.py`
 - Источник: `M:\Project vscode\TrafficApp\EOS.png`

@@ -3,9 +3,12 @@ package com.traffic.app
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -17,6 +20,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.core.content.FileProvider
@@ -33,7 +37,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.16"
+        const val CURRENT_VERSION = "1.1.17"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -136,7 +140,7 @@ class AboutFragment : Fragment() {
         })
         layout.addView(logoCard)
 
-        layout.addView(infoCard(ctx, t, dp, "👤", "Создатель", "Ekkir"))
+        layout.addView(creatorCard(ctx, t, dp))
         layout.addView(spacer(ctx, dp, 20f))
 
         // ── Обновления ────────────────────────────────────────────────────────
@@ -561,6 +565,72 @@ class AboutFragment : Fragment() {
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private fun creatorCard(ctx: Context, t: ThemeDef, dp: Float): LinearLayout {
+        val avaSize = (46 * dp).toInt()
+        val avatarFile = File(ctx.filesDir, "avatar.jpg")
+        val bitmap: Bitmap? = if (avatarFile.exists())
+            BitmapFactory.decodeFile(avatarFile.absolutePath) else null
+
+        val avatarView = if (bitmap != null) {
+            ImageView(ctx).apply {
+                setImageBitmap(bitmap)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                clipToOutline = true
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(v: View, outline: android.graphics.Outline) {
+                        outline.setOval(0, 0, v.width, v.height)
+                    }
+                }
+            }
+        } else {
+            ImageView(ctx).apply {
+                val b = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
+                val c = Canvas(b)
+                val p = Paint(Paint.ANTI_ALIAS_FLAG)
+                p.color = Color.parseColor(t.accent)
+                c.drawCircle(avaSize / 2f, avaSize / 2f, avaSize / 2f, p)
+                p.color = Color.parseColor(t.bg); p.textSize = avaSize * 0.44f
+                p.textAlign = Paint.Align.CENTER; p.typeface = Typeface.DEFAULT_BOLD
+                c.drawText("E", avaSize / 2f, avaSize / 2f + p.textSize / 3f, p)
+                setImageBitmap(b)
+                clipToOutline = true
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(v: View, outline: android.graphics.Outline) {
+                        outline.setOval(0, 0, v.width, v.height)
+                    }
+                }
+            }
+        }
+        avatarView.layoutParams = LinearLayout.LayoutParams(avaSize, avaSize).apply {
+            marginEnd = (12 * dp).toInt()
+        }
+
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((16 * dp).toInt(), (14 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
+            background = cardDrawable(t, 16f, dp)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * dp).toInt() }
+            addView(avatarView)
+            val textCol = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textCol.addView(TextView(ctx).apply {
+                text = "Создатель"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor(t.textSecondary))
+                setPadding(0, 0, 0, (3 * dp).toInt())
+            })
+            textCol.addView(TextView(ctx).apply {
+                text = "Ekkir"; textSize = 14f
+                setTextColor(Color.parseColor(t.textPrimary))
+            })
+            addView(textCol)
+        }
+    }
 
     private fun infoCard(ctx: Context, t: ThemeDef, dp: Float, icon: String, title: String, body: String): LinearLayout {
         return LinearLayout(ctx).apply {
