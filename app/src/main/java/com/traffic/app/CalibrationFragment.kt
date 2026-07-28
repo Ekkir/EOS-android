@@ -24,16 +24,10 @@ import java.util.concurrent.Executors
 
 class CalibrationFragment : Fragment() {
 
-    companion object {
-        fun newTabbed(tab: Int) = CalibrationFragment().apply {
-            arguments = Bundle().apply { putInt("initial_tab", tab) }
-        }
-    }
-
     private val executor = Executors.newSingleThreadExecutor()
     private val handler  = Handler(Looper.getMainLooper())
     private val prefs    get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://2.61.59.197:5000")!!
+    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
 
     private val nameMap  = mapOf("pereval" to "Перевал", "abaza" to "Абаза", "zarechka" to "Заречка")
     private val colorMap = mapOf("pereval" to "#00c853", "abaza" to "#2979ff", "zarechka" to "#ff6d00")
@@ -47,10 +41,6 @@ class CalibrationFragment : Fragment() {
     private lateinit var roadContainer: LinearLayout
     private lateinit var startRow: LinearLayout
 
-    private lateinit var trafficScroll: ScrollView
-    private lateinit var mainScroll: ScrollView
-    private lateinit var tabTraffic: TextView
-    private lateinit var tabMain: TextView
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
@@ -62,39 +52,26 @@ class CalibrationFragment : Fragment() {
             background = bgDrawable(t)
         }
 
-        // ── Tab bar ─────────────────────────────────────────────────────────────
-        val tabBar = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
+        // Шапка с кнопкой назад
+        val header = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.parseColor(t.nav))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            setPadding((16 * dp).toInt(), (12 * dp).toInt() + statusBarHeight(ctx), (16 * dp).toInt(), (12 * dp).toInt())
         }
+        header.addView(TextView(ctx).apply {
+            text = "←"; textSize = 22f; gravity = Gravity.CENTER
+            setTextColor(Color.parseColor(t.textPrimary))
+            layoutParams = LinearLayout.LayoutParams((44 * dp).toInt(), (44 * dp).toInt())
+            setOnClickListener { requireActivity().onBackPressed() }
+        })
+        header.addView(TextView(ctx).apply {
+            text = "Светофоры"; textSize = 19f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.textPrimary))
+            setPadding((12 * dp).toInt(), 0, 0, 0)
+        })
+        root.addView(header)
 
-        fun makeTab(label: String): TextView = TextView(ctx).apply {
-            text = label; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, (24 * dp).toInt(), 0, (18 * dp).toInt())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            isClickable = true; isFocusable = true
-        }
-
-        tabTraffic = makeTab("Светофоры")
-        tabMain    = makeTab("Подключение")
-        tabBar.addView(tabTraffic)
-        tabBar.addView(tabMain)
-        root.addView(tabBar)
-
-        trafficScroll = buildTrafficContent(ctx, t, dp)
-        root.addView(trafficScroll)
-
-        mainScroll = buildMainContent(ctx, t, dp)
-        mainScroll.visibility = View.GONE
-        root.addView(mainScroll)
-
-        tabTraffic.setOnClickListener { switchTab(0) }
-        tabMain.setOnClickListener    { switchTab(1) }
-        switchTab(arguments?.getInt("initial_tab", 0) ?: 0)
+        root.addView(buildTrafficContent(ctx, t, dp))
 
         loadConfig()
         return root
@@ -104,14 +81,6 @@ class CalibrationFragment : Fragment() {
         super.onDestroyView()
         handler.removeCallbacksAndMessages(null)
         executor.shutdown()
-    }
-
-    private fun switchTab(index: Int) {
-        val t = AppTheme.current
-        trafficScroll.visibility = if (index == 0) View.VISIBLE else View.GONE
-        mainScroll.visibility    = if (index == 1) View.VISIBLE else View.GONE
-        tabTraffic.setTextColor(if (index == 0) Color.parseColor(t.accent) else Color.parseColor(t.textSecondary))
-        tabMain.setTextColor(   if (index == 1) Color.parseColor(t.accent) else Color.parseColor(t.textSecondary))
     }
 
     // ── Светофоры ─────────────────────────────────────────────────────────────
@@ -179,71 +148,6 @@ class CalibrationFragment : Fragment() {
         return scroll
     }
 
-    // ── Основное ──────────────────────────────────────────────────────────────
-    private fun buildMainContent(ctx: Context, t: ThemeDef, dp: Float): ScrollView {
-        val scroll = ScrollView(ctx).apply { if (!t.isGlass) setBackgroundColor(Color.parseColor(t.bg)) }
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((20 * dp).toInt(), (24 * dp).toInt(), (20 * dp).toInt(), (48 * dp).toInt())
-        }
-        scroll.addView(layout)
-
-        // ── Подключение ────────────────────────────────────────────────────────
-        layout.addView(sectionLabel(ctx, "Подключение", t, dp))
-        layout.addView(spacer(ctx, dp, 12f))
-
-        val serverCard = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt())
-            background = cardDrawable(t, 16f, dp)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.bottomMargin = (32 * dp).toInt() }
-        }
-        serverCard.addView(settingsLabel(ctx, t, dp, "Адрес сервера"))
-        val urlInput = EditText(ctx).apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            setText(prefs.getString("server_url", "http://2.61.59.197:5000"))
-            setTextColor(Color.parseColor(t.textPrimary))
-            setHintTextColor(hexAlpha(t.textSecondary, 90))
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = 10f * dp
-                setColor(hexAlpha(t.bg, 200))
-                setStroke(1, Color.parseColor(t.cardBorder))
-            }
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
-            textSize = 14f
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.topMargin = (6 * dp).toInt() }
-        }
-        serverCard.addView(urlInput)
-        serverCard.addView(TextView(ctx).apply {
-            text = "WiFi: http://192.168.0.15:5000\nИнтернет: http://2.61.59.197:5000"
-            textSize = 11f; setTextColor(Color.parseColor(t.textSecondary))
-            setPadding(0, (6 * dp).toInt(), 0, 0)
-        })
-        serverCard.addView(spacer(ctx, dp, 12f))
-        serverCard.addView(Button(ctx).apply {
-            text = "Сохранить адрес"; textSize = 14f; isAllCaps = false
-            setTextColor(Color.parseColor(t.bg))
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE; cornerRadius = 10f * dp
-                setColor(Color.parseColor(t.accent))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, (44 * dp).toInt()
-            )
-            setOnClickListener {
-                prefs.edit().putString("server_url", urlInput.text.toString().trimEnd('/')).apply()
-                text = "✓ Сохранено"
-                postDelayed({ text = "Сохранить адрес" }, 1500)
-            }
-        })
-        layout.addView(serverCard)
-
-        return scroll
-    }
 
     // ── Рендеры дорог ─────────────────────────────────────────────────────────
     private fun renderRoads() {

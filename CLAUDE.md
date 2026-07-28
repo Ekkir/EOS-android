@@ -10,15 +10,19 @@
 - Сборка: `.\gradlew.bat assembleDebug` из `M:\Project vscode\TrafficApp`
 
 ## Сервер
-- Flask, Ubuntu MacBook (сервер = MacBook Pro), SSH: `ekkir@192.168.0.15`
-- Адрес: `http://192.168.0.15:5000` (локальная сеть) / `http://2.61.59.197:5000` (внешний, дефолт в prefs)
-- Файл сервера: `~/traffic_server/server.py`
+- Flask, Ubuntu Linux на MacBook, SSH: `ekkir@192.168.0.15`
+- Публичный адрес: `http://eos-traffic.ddns.net:5000` (No-IP DDNS), обновляется через cron каждые 5 мин
+- Файл сервера: `~/traffic_server/server.py`; лог: `~/traffic_server/server.log`
+- Запуск: `nohup python3 server.py >> server.log 2>&1 &`
+- Добавить в автозапуск: `@reboot cd ~/traffic_server && nohup python3 server.py >> server.log 2>&1 &` (crontab)
 - Эндпоинты:
   - `GET /lights` — текущие состояния светофоров
-  - `POST /reset` — сброс цикла на нужную дорогу
+  - `POST /reset` — сброс цикла `{road: "pereval"|"abaza"|"zarechka"}`
   - `GET /config` / `POST /config` — тайминги, порядок фаз
-  - `GET /messages?since=N` — сообщения мессенджера (с ID > N)
-  - `POST /messages` — отправить сообщение `{sender, text}`
+  - `GET /messages?since=N` / `POST /messages` — мессенджер
+  - `POST /check_admin` — проверка пароля `{password: "..."}` → 200 OK / 403
+  - `GET /log` — последние 80 строк server.log в `{log: "..."}`
+  - `GET /stats` — `{cpu_usage, mem_used, mem_total, disk_used, disk_total}`
 
 ## Разделы приложения
 | ID | Иконка | Название | Класс |
@@ -58,6 +62,8 @@
 - `theme_id` — текущая тема
 - `profile_name` — имя пользователя
 - `cross_{key}_lat/lon` — координаты перекрёстков на карте
+- `google_signed_in` — вошли через Google (Boolean)
+- `google_name`, `google_email`, `google_photo_url` — данные Google-аккаунта
 
 ## Светофоры (RoadMapView)
 - Три направления: `pereval` (Перевал), `abaza` (Абаза), `zarechka` (Заречка)
@@ -74,6 +80,15 @@
 ## Профиль (ProfileFragment)
 - Аватар сохраняется в `filesDir/avatar.jpg`
 - Имя сохраняется в `traffic_prefs → profile_name`
+- Google Sign-In через `play-services-auth:21.2.0` + Firebase (`google-services.json`)
+  - Сохраняет в prefs: `google_signed_in`, `google_name`, `google_email`, `google_photo_url`
+  - Имя/фото автоподтягиваются только если поля пустые
+
+## Настройки → Эндминестратор (SettingsFragment / AdminFragment)
+- Виден только для `google_email == "razzorenovkiril@gmail.com"`
+- При открытии запрашивает пароль через POST `/check_admin`; на 200 — открывает AdminFragment
+- AdminFragment: статус сервера, статистика системы (ЦП/ОЗУ/Диск), журнал сервера
+- Статистика обновляется автоматически каждые 10 секунд
 
 ## Карта (MapFragment)
 - OSMDroid (офлайн-тайлы поддерживаются)

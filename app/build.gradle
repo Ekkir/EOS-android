@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -11,8 +12,8 @@ android {
         applicationId "com.traffic.app"
         minSdk 21
         targetSdk 36
-        versionCode 8
-        versionName "1.1.6"
+        versionCode 18
+        versionName "1.1.16"
     }
 
     buildTypes {
@@ -35,4 +36,5 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'org.osmdroid:osmdroid-android:6.1.18'
     implementation 'androidx.work:work-runtime:2.9.0'
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
 }

@@ -33,7 +33,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.6"
+        const val CURRENT_VERSION = "1.1.16"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -46,6 +46,7 @@ class AboutFragment : Fragment() {
     private var sheetOverlay: View? = null
     private var storedSheetH = 0
     private var shimmerAnimator: ValueAnimator? = null
+    private var downloadShimmer: ValueAnimator? = null
     private var cachedDp = 0f
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -196,6 +197,7 @@ class AboutFragment : Fragment() {
         handler.removeCallbacksAndMessages(null)
         executor.shutdown()
         shimmerAnimator?.cancel()
+        downloadShimmer?.cancel()
     }
 
     private fun startButtonShimmer() {
@@ -220,6 +222,50 @@ class AboutFragment : Fragment() {
 
     private fun stopButtonShimmer() {
         shimmerAnimator?.cancel(); shimmerAnimator = null
+        if (!isAdded) return
+        val t = AppTheme.current
+        updateBtn.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE; cornerRadius = 12f * cachedDp
+            setColor(Color.parseColor(t.accent))
+        }
+    }
+
+    private fun startDownloadShimmer() {
+        val t = AppTheme.current
+        val accent = Color.parseColor(t.accent)
+        // Яркость акцента: если светлый (minimal) — тёмный отблеск, если тёмный — белый отблеск
+        val lum = (0.299f * Color.red(accent) + 0.587f * Color.green(accent) + 0.114f * Color.blue(accent)) / 255f
+        val highlight = if (lum > 0.55f)
+            Color.argb(255, (Color.red(accent) * 0.45f).toInt(), (Color.green(accent) * 0.45f).toInt(), (Color.blue(accent) * 0.45f).toInt())
+        else
+            Color.WHITE
+        downloadShimmer?.cancel()
+        downloadShimmer = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1100; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
+            addUpdateListener { anim ->
+                if (!isAdded) return@addUpdateListener
+                val f = anim.animatedValue as Float
+                fun spot(pos: Float): Int {
+                    val d = (f - pos).let { if (it < 0f) it + 1f else it }
+                    if (d > 0.28f) return accent
+                    val blend = 1f - d / 0.28f
+                    return Color.argb(255,
+                        (Color.red(accent)   + (Color.red(highlight)   - Color.red(accent))   * blend).toInt().coerceIn(0, 255),
+                        (Color.green(accent) + (Color.green(highlight) - Color.green(accent)) * blend).toInt().coerceIn(0, 255),
+                        (Color.blue(accent)  + (Color.blue(highlight)  - Color.blue(accent))  * blend).toInt().coerceIn(0, 255)
+                    )
+                }
+                updateBtn.background = GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(spot(0f), spot(0.33f), spot(0.66f), spot(1f))
+                ).apply { cornerRadius = 12f * cachedDp }
+            }
+            start()
+        }
+    }
+
+    private fun stopDownloadShimmer() {
+        downloadShimmer?.cancel(); downloadShimmer = null
         if (!isAdded) return
         val t = AppTheme.current
         updateBtn.background = GradientDrawable().apply {
@@ -440,6 +486,7 @@ class AboutFragment : Fragment() {
     private fun downloadAndInstall(ctx: Context, apkUrl: String, totalSize: Long, dp: Float) {
         updateBtn.isEnabled = false
         updateBtn.text = "Скачиваю..."
+        startDownloadShimmer()
         progressBar.progress = 0
         progressBar.visibility = View.VISIBLE
         updateStatus.setTextColor(Color.parseColor(AppTheme.current.textSecondary))
@@ -471,6 +518,7 @@ class AboutFragment : Fragment() {
 
                 handler.post {
                     if (!isAdded) return@post
+                    stopDownloadShimmer()
                     progressBar.visibility = View.GONE
                     updateStatus.text = "Загрузка завершена. Запускаю установщик..."
                     installApk(ctx, outFile)
@@ -478,6 +526,7 @@ class AboutFragment : Fragment() {
             } catch (e: Exception) {
                 handler.post {
                     if (!isAdded) return@post
+                    stopDownloadShimmer()
                     progressBar.visibility = View.GONE
                     updateStatus.setTextColor(Color.parseColor("#FF6B6B"))
                     updateStatus.text = "Ошибка загрузки: ${e.message}"

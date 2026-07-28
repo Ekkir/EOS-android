@@ -38,7 +38,7 @@ class MapFragment : Fragment() {
     private val executor = Executors.newSingleThreadExecutor()
 
     private val prefs get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://2.61.59.197:5000")!!
+    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
 
     private var permissionAsked = false
     private var lightStates = mapOf<String, String>()  // road -> "red"/"yellow"/"green"

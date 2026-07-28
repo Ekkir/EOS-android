@@ -26,7 +26,7 @@ class TrafficFragment : Fragment() {
     private val executor = Executors.newSingleThreadExecutor()
 
     private val prefs     get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://2.61.59.197:5000")!!
+    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
 
     private val viewpoints = listOf(
         "pereval"  to "Перевал",
@@ -214,7 +214,7 @@ class TrafficFragment : Fragment() {
         }
         layout.addView(urlInput)
         layout.addView(TextView(ctx).apply {
-            text = "Дома (WiFi): http://192.168.0.15:5000\nИнтернет:    http://2.61.59.197:5000"
+            text = "Дома (WiFi): http://192.168.0.15:5000\nИнтернет:    http://eos-traffic.ddns.net:5000"
             setTextColor(Color.parseColor("#555577")); textSize = 12f; setPadding(0, 4, 0, 24)
         })
 
