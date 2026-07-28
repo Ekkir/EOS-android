@@ -33,11 +33,11 @@ class SettingsFragment : Fragment() {
         })
 
         layout.addView(buildItem("🎨", "Темы", "Оформление приложения", dp, t) {
-            openFragment(CalibrationFragment.newTabbed(1), "calib_theme")
+            openFragment(ThemesFragment(), "themes")
         })
         layout.addView(spacer(ctx, dp, 12f))
         layout.addView(buildItem("🚦", "Светофоры", "Тайминги и порядок фаз", dp, t) {
-            openFragment(CalibrationFragment.newTabbed(0), "calib_traffic")
+            openFragment(CalibrationFragment(), "calib_traffic")
         })
         layout.addView(spacer(ctx, dp, 12f))
         layout.addView(buildItem("ℹ️", "О приложении", "Версия, обновления", dp, t) {

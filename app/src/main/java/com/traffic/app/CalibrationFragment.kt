@@ -80,7 +80,7 @@ class CalibrationFragment : Fragment() {
         }
 
         tabTraffic = makeTab("Светофоры")
-        tabMain    = makeTab("Основное")
+        tabMain    = makeTab("Подключение")
         tabBar.addView(tabTraffic)
         tabBar.addView(tabMain)
         root.addView(tabBar)
@@ -241,118 +241,6 @@ class CalibrationFragment : Fragment() {
             }
         })
         layout.addView(serverCard)
-
-        // ── Оформление ─────────────────────────────────────────────────────────
-        layout.addView(sectionLabel(ctx, "Оформление", t, dp))
-        layout.addView(spacer(ctx, dp, 12f))
-
-        val accentPresets = mapOf(
-            "glass"     to listOf("#0A84FF","#BF5AF2","#FF375F","#30D158","#FF9F0A","#5AC8FA"),
-            "glassneon" to listOf("#CC00FF","#00FF7F","#00BFFF","#FF00AA","#FFD700","#FF4400"),
-            "neon"      to listOf("#00FFFF","#FF00FF","#00FF00","#FFFF00","#FF6600","#FF0066"),
-            "minimal"   to listOf("#DDDDDD","#AAAAAA","#88AACC","#CCAA77","#77AACC","#CC8888"),
-        )
-
-        val currentId = prefs.getString("theme_id", "glass") ?: "glass"
-        AppTheme.themes.forEach { theme ->
-            val isSelected = theme.id == currentId
-            val card = LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding((16 * dp).toInt(), (14 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).also { it.bottomMargin = (10 * dp).toInt() }
-                background = if (isSelected) {
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE; cornerRadius = 16f * dp
-                        setColor(hexAlpha(theme.accent, 24))
-                        setStroke((2 * dp).toInt(), Color.parseColor(theme.accent))
-                    }
-                } else {
-                    cardDrawable(theme, 16f, dp)
-                }
-                isClickable = true; isFocusable = true
-            }
-
-            val iconBox = FrameLayout(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt()).also {
-                    it.marginEnd = (14 * dp).toInt()
-                }
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor(theme.accent))
-                }
-            }
-            card.addView(iconBox)
-
-            val texts = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            texts.addView(TextView(ctx).apply {
-                text = theme.name; textSize = 16f; typeface = Typeface.DEFAULT_BOLD
-                setTextColor(Color.parseColor(theme.textPrimary))
-            })
-            texts.addView(TextView(ctx).apply {
-                text = theme.bg + "  ·  " + theme.accent
-                textSize = 11f; setTextColor(Color.parseColor(theme.textSecondary))
-                setPadding(0, (2 * dp).toInt(), 0, 0)
-            })
-            card.addView(texts)
-
-            if (isSelected) {
-                card.addView(TextView(ctx).apply {
-                    text = "✓"; textSize = 18f; typeface = Typeface.DEFAULT_BOLD
-                    setTextColor(Color.parseColor(theme.accent))
-                    gravity = Gravity.CENTER
-                    layoutParams = LinearLayout.LayoutParams((36 * dp).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
-                })
-            }
-
-            card.setOnClickListener {
-                AppTheme.apply(ctx, theme.id)
-                requireActivity().recreate()
-            }
-            layout.addView(card)
-
-            if (isSelected) {
-                val presets = accentPresets[theme.id] ?: emptyList()
-                val customAccent = prefs.getString("accent_${theme.id}", theme.accent) ?: theme.accent
-                val swatchRow = LinearLayout(ctx).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                }
-                swatchRow.addView(TextView(ctx).apply {
-                    text = "Акцент"; textSize = 12f
-                    setTextColor(Color.parseColor(t.textSecondary))
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                        marginEnd = (12 * dp).toInt()
-                    }
-                })
-                presets.forEach { color ->
-                    val active = color.equals(customAccent, ignoreCase = true)
-                    val size = (32 * dp).toInt()
-                    swatchRow.addView(View(ctx).apply {
-                        layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = (8 * dp).toInt() }
-                        background = GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(Color.parseColor(color))
-                            setStroke(if (active) (2 * dp).toInt() else 0, Color.WHITE)
-                        }
-                        isClickable = true; isFocusable = true
-                        setOnClickListener {
-                            prefs.edit().putString("accent_${theme.id}", color).apply()
-                            AppTheme.apply(ctx, theme.id)
-                            requireActivity().recreate()
-                        }
-                    })
-                }
-                layout.addView(swatchRow)
-            }
-        }
 
         return scroll
     }
