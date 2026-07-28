@@ -263,10 +263,10 @@ class MessengerFragment : Fragment() {
 
     // ── Медиа: загрузка ─────────────────────────────────────────
     private fun showAttachSheet(ctx: Context, t: ThemeDef, dp: Float) {
-        val dp2 = ctx.resources.displayMetrics.density
-        val root = requireActivity().window.decorView as FrameLayout
+        val root    = requireActivity().findViewById<FrameLayout>(R.id.rootLayout)
         val screenH = ctx.resources.displayMetrics.heightPixels
         val sheetH  = (screenH * 0.3).toInt()
+        var sheetRef: FrameLayout? = null
 
         val dim = View(ctx).apply {
             setBackgroundColor(Color.argb(150, 0, 0, 0)); alpha = 0f
@@ -275,17 +275,19 @@ class MessengerFragment : Fragment() {
         root.addView(dim)
         dim.animate().alpha(1f).setDuration(200).start()
 
-        val content = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(t.nav))
-            setPadding((16 * dp2).toInt(), (16 * dp2).toInt(), (16 * dp2).toInt(), (32 * dp2).toInt())
-        }
-
         fun dismiss() {
-            dim.animate().alpha(0f).setDuration(180).withEndAction { root.removeView(dim); root.removeView(content) }.start()
+            val s = sheetRef ?: return
+            s.animate().translationY(sheetH.toFloat()).setDuration(200).withEndAction {
+                root.removeView(dim); root.removeView(s)
+            }.start()
+            dim.animate().alpha(0f).setDuration(200).start()
         }
         dim.setOnClickListener { dismiss() }
 
+        val content = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (32 * dp).toInt())
+        }
         listOf(
             Triple("🖼️", "Изображение", "image/*"),
             Triple("📄", "Файл",         "*/*"),
@@ -293,12 +295,12 @@ class MessengerFragment : Fragment() {
             content.addView(LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity     = Gravity.CENTER_VERTICAL
-                setPadding((8 * dp2).toInt(), (14 * dp2).toInt(), (8 * dp2).toInt(), (14 * dp2).toInt())
+                setPadding((8 * dp).toInt(), (14 * dp).toInt(), (8 * dp).toInt(), (14 * dp).toInt())
                 isClickable = true; isFocusable = true
                 setOnClickListener { dismiss(); pickMedia.launch(mime) }
                 addView(TextView(ctx).apply {
                     text = icon; textSize = 24f; gravity = Gravity.CENTER
-                    layoutParams = LinearLayout.LayoutParams((44 * dp2).toInt(), (44 * dp2).toInt()).apply { marginEnd = (12 * dp2).toInt() }
+                    layoutParams = LinearLayout.LayoutParams((44 * dp).toInt(), (44 * dp).toInt()).apply { marginEnd = (12 * dp).toInt() }
                 })
                 addView(TextView(ctx).apply {
                     text = label; textSize = 16f
@@ -309,12 +311,13 @@ class MessengerFragment : Fragment() {
 
         val sheet = FrameLayout(ctx).apply {
             background = GradientDrawable().apply {
-                cornerRadii = floatArrayOf(24 * dp2, 24 * dp2, 24 * dp2, 24 * dp2, 0f, 0f, 0f, 0f)
+                cornerRadii = floatArrayOf(24 * dp, 24 * dp, 24 * dp, 24 * dp, 0f, 0f, 0f, 0f)
                 setColor(Color.parseColor(t.nav))
             }
             translationY = sheetH.toFloat()
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, sheetH).apply { gravity = Gravity.BOTTOM }
         }
+        sheetRef = sheet
         sheet.addView(content, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         root.addView(sheet)
         sheet.animate().translationY(0f).setDuration(280).setInterpolator(DecelerateInterpolator(2f)).start()
@@ -576,7 +579,7 @@ class MessengerFragment : Fragment() {
     }
 
     private fun openMediaFullscreen(ctx: Context, t: ThemeDef, dp: Float, mediaId: String) {
-        val root = requireActivity().window.decorView as FrameLayout
+        val root = requireActivity().findViewById<FrameLayout>(R.id.rootLayout)
         val dim = View(ctx).apply {
             setBackgroundColor(Color.argb(220, 0, 0, 0)); alpha = 0f
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)

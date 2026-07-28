@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -37,7 +38,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.17"
+        const val CURRENT_VERSION = "1.1.18"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -567,43 +568,61 @@ class AboutFragment : Fragment() {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun creatorCard(ctx: Context, t: ThemeDef, dp: Float): LinearLayout {
-        val avaSize = (46 * dp).toInt()
-        val avatarFile = File(ctx.filesDir, "avatar.jpg")
-        val bitmap: Bitmap? = if (avatarFile.exists())
-            BitmapFactory.decodeFile(avatarFile.absolutePath) else null
+        val avaSize    = (46 * dp).toInt()
+        val prefs      = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+        val senderName = prefs.getString("profile_name", "")?.takeIf { it.isNotBlank() } ?: "Ekkir"
+        val srvUrl     = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
 
-        val avatarView = if (bitmap != null) {
-            ImageView(ctx).apply {
-                setImageBitmap(bitmap)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                clipToOutline = true
-                outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(v: View, outline: android.graphics.Outline) {
-                        outline.setOval(0, 0, v.width, v.height)
-                    }
+        fun makePlaceholder(): Bitmap {
+            val b = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
+            val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            p.color = Color.parseColor(t.accent)
+            c.drawCircle(avaSize / 2f, avaSize / 2f, avaSize / 2f, p)
+            p.color = Color.parseColor(t.bg); p.textSize = avaSize * 0.44f
+            p.textAlign = Paint.Align.CENTER; p.typeface = Typeface.DEFAULT_BOLD
+            c.drawText("E", avaSize / 2f, avaSize / 2f + p.textSize / 3f, p)
+            return b
+        }
+
+        val avatarView = ImageView(ctx).apply {
+            setImageBitmap(makePlaceholder())
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(v: View, outline: android.graphics.Outline) {
+                    outline.setOval(0, 0, v.width, v.height)
                 }
             }
-        } else {
-            ImageView(ctx).apply {
-                val b = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
-                val c = Canvas(b)
-                val p = Paint(Paint.ANTI_ALIAS_FLAG)
-                p.color = Color.parseColor(t.accent)
-                c.drawCircle(avaSize / 2f, avaSize / 2f, avaSize / 2f, p)
-                p.color = Color.parseColor(t.bg); p.textSize = avaSize * 0.44f
-                p.textAlign = Paint.Align.CENTER; p.typeface = Typeface.DEFAULT_BOLD
-                c.drawText("E", avaSize / 2f, avaSize / 2f + p.textSize / 3f, p)
-                setImageBitmap(b)
-                clipToOutline = true
-                outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(v: View, outline: android.graphics.Outline) {
-                        outline.setOval(0, 0, v.width, v.height)
-                    }
-                }
+            layoutParams = LinearLayout.LayoutParams(avaSize, avaSize).apply {
+                marginEnd = (12 * dp).toInt()
             }
         }
-        avatarView.layoutParams = LinearLayout.LayoutParams(avaSize, avaSize).apply {
-            marginEnd = (12 * dp).toInt()
+
+        executor.execute {
+            try {
+                val avatarFile = File(ctx.filesDir, "avatar.jpg")
+                if (avatarFile.exists()) {
+                    val boundary = "----Boundary${System.currentTimeMillis()}"
+                    val conn = URL("$srvUrl/avatar").openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"; conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                    conn.connectTimeout = 8000; conn.readTimeout = 8000
+                    val out = conn.outputStream
+                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"sender\"\r\n\r\n$senderName\r\n".toByteArray())
+                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"avatar.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".toByteArray())
+                    out.write(avatarFile.readBytes())
+                    out.write("\r\n--$boundary--\r\n".toByteArray())
+                    out.flush(); conn.responseCode; conn.disconnect()
+                }
+                val raw = BitmapFactory.decodeStream(URL("$srvUrl/avatar/$senderName").openStream())
+                if (raw != null) {
+                    val circular = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
+                    val c = Canvas(circular); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+                    p.shader = BitmapShader(Bitmap.createScaledBitmap(raw, avaSize, avaSize, true), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                    c.drawCircle(avaSize / 2f, avaSize / 2f, avaSize / 2f, p)
+                    handler.post { if (isAdded) avatarView.setImageBitmap(circular) }
+                }
+            } catch (_: Exception) {}
         }
 
         return LinearLayout(ctx).apply {
