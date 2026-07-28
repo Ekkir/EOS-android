@@ -38,7 +38,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.19"
+        const val CURRENT_VERSION = "1.1.20"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -616,9 +616,11 @@ class AboutFragment : Fragment() {
                 }
                 val raw = BitmapFactory.decodeStream(URL("$srvUrl/avatar/$senderName").openStream())
                 if (raw != null) {
+                    val min = minOf(raw.width, raw.height)
+                    val cropped = Bitmap.createBitmap(raw, (raw.width - min) / 2, (raw.height - min) / 2, min, min)
                     val circular = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
                     val c = Canvas(circular); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-                    p.shader = BitmapShader(Bitmap.createScaledBitmap(raw, avaSize, avaSize, true), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                    p.shader = BitmapShader(Bitmap.createScaledBitmap(cropped, avaSize, avaSize, true), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
                     c.drawCircle(avaSize / 2f, avaSize / 2f, avaSize / 2f, p)
                     handler.post { if (isAdded) avatarView.setImageBitmap(circular) }
                 }

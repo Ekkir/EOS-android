@@ -74,6 +74,19 @@
 - **Офлайн-режим**: при потере связи таймер продолжает считать по `elapsed()` (секунды с последнего ответа сервера); показывает префикс `~` и баннер "● нет связи — время расчётное"
 - Опрос сервера каждые 1 сек (TrafficFragment)
 
+## Подключение к серверу (ServerUrlResolver)
+- `object ServerUrlResolver` в `Drawables.kt` — автовыбор адреса
+- Пробует `server_url_local` (по умолчанию `http://192.168.0.15:5000`) с таймаутом 700 мс
+- Если LAN недоступен — использует `server_url` (DDNS)
+- Кэш 30 секунд, сброс через `ServerUrlResolver.reset()` (вызывается при сохранении настроек)
+- Все фрагменты: `private val serverUrl get() = ServerUrlResolver.resolve(prefs)`
+
+## Профили пользователей (сервер)
+- `POST /profile` → `{google_email, display_name}` — сохраняет профиль
+- `GET /profile/<email>` → `{display_name, updated_at}`
+- Аватар по email: `POST /avatar` с полем `google_email` + `GET /avatar/email/<email>`
+- ProfileFragment: при сохранении → синкает имя+аватар на сервер; при Google sign-in → восстанавливает с сервера
+
 ## Мессенджер (MessengerFragment)
 - Чат между пользователями приложения
 - Опрос `/messages?since=lastId` каждые 2 сек

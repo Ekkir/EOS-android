@@ -636,14 +636,13 @@ class MessengerFragment : Fragment() {
     }
 
     private fun circularBitmap(src: Bitmap, size: Int): Bitmap {
-        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(out)
-        val paint  = Paint(Paint.ANTI_ALIAS_FLAG)
-        val shader = BitmapShader(
-            Bitmap.createScaledBitmap(src, size, size, true),
-            Shader.TileMode.CLAMP, Shader.TileMode.CLAMP
-        )
-        paint.shader = shader
+        val min     = minOf(src.width, src.height)
+        val cropped = Bitmap.createBitmap(src, (src.width - min) / 2, (src.height - min) / 2, min, min)
+        val scaled  = Bitmap.createScaledBitmap(cropped, size, size, true)
+        val out     = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas  = Canvas(out)
+        val paint   = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.shader = BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
         return out
     }
