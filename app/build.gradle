@@ -4,6 +4,10 @@ plugins {
     id 'com.google.gms.google-services'
 }
 
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file("keystore.properties")
+if (keystoreFile.exists()) { keystoreProps.load(new FileInputStream(keystoreFile)) }
+
 android {
     namespace 'com.traffic.app'
     compileSdk 36
@@ -16,9 +20,22 @@ android {
         versionName "1.1.18"
     }
 
+    signingConfigs {
+        release {
+            storeFile     keystoreProps['storeFile'] ? file(keystoreProps['storeFile']) : null
+            storePassword keystoreProps['storePassword']
+            keyAlias      keystoreProps['keyAlias']
+            keyPassword   keystoreProps['keyPassword']
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
         }
     }
 
