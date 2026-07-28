@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "777927828803",
+    "project_id": "e-os-8da6e",
+    "storage_bucket": "e-os-8da6e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:777927828803:android:425e481dd32833438b7bf6",
+        "android_client_info": {
+          "package_name": "com.traffic.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "777927828803-34fk2m2t3dotdearf6pu1l1fc5bbdeor.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAL0bSNtyW10OJEY-9b_djaoPWtL9wmVJg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "777927828803-34fk2m2t3dotdearf6pu1l1fc5bbdeor.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
