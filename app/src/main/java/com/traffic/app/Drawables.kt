@@ -1,6 +1,7 @@
 package com.traffic.app
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.drawable.ColorDrawable
@@ -111,3 +112,29 @@ fun accentBox(theme: ThemeDef, density: Float, cornerDp: Float = 8f): GradientDr
         cornerRadius = cornerDp * density
         setColor(hexAlpha(theme.accent, 30))
     }
+
+// Автоматически выбирает LAN-адрес если доступен, иначе DDNS. Кэш 30 секунд.
+object ServerUrlResolver {
+    @Volatile private var cached  = ""
+    @Volatile private var lastMs  = 0L
+    private const val TTL = 30_000L
+
+    fun resolve(prefs: SharedPreferences): String {
+        val now = System.currentTimeMillis()
+        if (cached.isNotEmpty() && now - lastMs < TTL) return cached
+        val remote = prefs.getString("server_url",       "http://eos-traffic.ddns.net:5000") ?: "http://eos-traffic.ddns.net:5000"
+        val local  = prefs.getString("server_url_local", "http://192.168.0.15:5000")?.takeIf { it.isNotBlank() }
+            ?: return remote.also { cached = it; lastMs = now }
+        return try {
+            val conn = java.net.URL("$local/stats").openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 700; conn.readTimeout = 700
+            val ok = conn.responseCode == 200
+            conn.disconnect()
+            (if (ok) local else remote).also { cached = it; lastMs = now }
+        } catch (_: Exception) {
+            remote.also { cached = it; lastMs = now }
+        }
+    }
+
+    fun reset() { cached = ""; lastMs = 0L }
+}

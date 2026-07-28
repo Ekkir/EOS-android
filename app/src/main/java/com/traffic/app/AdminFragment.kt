@@ -22,7 +22,7 @@ import java.util.concurrent.Executors
 class AdminFragment : Fragment() {
 
     private val prefs get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
+    private val serverUrl get() = ServerUrlResolver.resolve(prefs)
     private val handler  = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
 

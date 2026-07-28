@@ -79,8 +79,36 @@ class ConnectionFragment : Fragment() {
         }
         serverCard.addView(urlInput)
 
+        serverCard.addView(View(ctx).apply {
+            setBackgroundColor(Color.parseColor(t.cardBorder))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply { topMargin = (14 * dp).toInt() }
+        })
+
         serverCard.addView(TextView(ctx).apply {
-            text = "WiFi: http://192.168.0.15:5000\nИнтернет: http://eos-traffic.ddns.net:5000"
+            text = "ЛОКАЛЬНЫЙ АДРЕС (Wi-Fi)"; textSize = 10f; letterSpacing = 0.1f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor(t.textSecondary))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = (12 * dp).toInt() }
+        })
+
+        val localInput = EditText(ctx).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setText(prefs.getString("server_url_local", "http://192.168.0.15:5000"))
+            hint = "http://192.168.0.15:5000"
+            setTextColor(Color.parseColor(t.textPrimary))
+            setHintTextColor(hexAlpha(t.textSecondary, 90))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE; cornerRadius = 10f * dp
+                setColor(hexAlpha(t.bg, 200))
+                setStroke(1, Color.parseColor(t.cardBorder))
+            }
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = (8 * dp).toInt() }
+        }
+        serverCard.addView(localInput)
+
+        serverCard.addView(TextView(ctx).apply {
+            text = "Приложение автоматически выбирает локальный адрес если доступен, иначе — основной"
             textSize = 11f; setTextColor(Color.parseColor(t.textSecondary))
             setPadding(0, (6 * dp).toInt(), 0, (12 * dp).toInt())
         })
@@ -94,7 +122,11 @@ class ConnectionFragment : Fragment() {
             }
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (48 * dp).toInt())
             setOnClickListener {
-                prefs.edit().putString("server_url", urlInput.text.toString().trimEnd('/')).apply()
+                prefs.edit()
+                    .putString("server_url",       urlInput.text.toString().trimEnd('/'))
+                    .putString("server_url_local",  localInput.text.toString().trimEnd('/'))
+                    .apply()
+                ServerUrlResolver.reset()
                 text = "✓ Сохранено"
                 postDelayed({ text = "Сохранить" }, 1500)
             }

@@ -60,7 +60,7 @@ class MessengerFragment : Fragment() {
     private val executor = Executors.newSingleThreadExecutor()
 
     private val prefs     get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
+    private val serverUrl get() = ServerUrlResolver.resolve(prefs)
     private val myName    get() = prefs.getString("profile_name", "")?.takeIf { it.isNotBlank() }
         ?: "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
 

@@ -137,8 +137,7 @@ class SettingsFragment : Fragment() {
     private fun showAdminPasswordDialog(ctx: Context, t: ThemeDef, dp: Float) {
         if (adminUnlocked) { openFragment(AdminFragment(), "admin"); return }
 
-        val serverUrl = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-            .getString("server_url", "http://eos-traffic.ddns.net:5000")!!
+        val prefs = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
 
         val input = EditText(ctx).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -169,6 +168,7 @@ class SettingsFragment : Fragment() {
                     this.text = "Проверяю..."
                     executor.execute {
                         try {
+                            val serverUrl = ServerUrlResolver.resolve(prefs)
                             val conn = URL("$serverUrl/check_admin").openConnection() as HttpURLConnection
                             conn.requestMethod = "POST"
                             conn.setRequestProperty("Content-Type", "application/json")

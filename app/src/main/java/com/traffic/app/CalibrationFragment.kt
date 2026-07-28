@@ -27,7 +27,7 @@ class CalibrationFragment : Fragment() {
     private val executor = Executors.newSingleThreadExecutor()
     private val handler  = Handler(Looper.getMainLooper())
     private val prefs    get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-    private val serverUrl get() = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
+    private val serverUrl get() = ServerUrlResolver.resolve(prefs)
 
     private val nameMap  = mapOf("pereval" to "Перевал", "abaza" to "Абаза", "zarechka" to "Заречка")
     private val colorMap = mapOf("pereval" to "#00c853", "abaza" to "#2979ff", "zarechka" to "#ff6d00")

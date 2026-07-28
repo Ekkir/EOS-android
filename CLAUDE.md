@@ -7,7 +7,10 @@
 - Min SDK: совместим с современными Android
 - ADB: `M:\sdk\platform-tools\adb.exe`
 - Java: `C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot`
-- Сборка: `.\gradlew.bat assembleDebug` из `M:\Project vscode\TrafficApp`
+- Сборка debug: `.\gradlew.bat assembleDebug` из `M:\Project vscode\TrafficApp`
+- Сборка release (подписанный): `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`
+- Подпись: `eos-release.jks` + `keystore.properties` (оба файла в корне проекта, в `.gitignore`, не коммитить)
+- Пароль keystore: `eos_release_key`, alias: `eos-key` — хранится только локально на M: диске
 
 ## Сервер
 - Flask, Ubuntu Linux на MacBook, SSH: `ekkir@192.168.0.15`

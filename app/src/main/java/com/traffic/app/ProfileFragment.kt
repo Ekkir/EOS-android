@@ -22,11 +22,14 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URL
+import org.json.JSONObject
 
 class ProfileFragment : Fragment() {
 
-    private val prefs get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+    private val prefs     get() = requireContext().getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+    private val serverUrl get() = ServerUrlResolver.resolve(prefs)
     private val handler = Handler(Looper.getMainLooper())
 
     private var avatarBig: ImageView? = null
@@ -40,6 +43,8 @@ class ProfileFragment : Fragment() {
         copyImageToInternal(uri)
         reloadAvatarBig()
         (activity as? MainActivity)?.reloadAvatar()
+        val email = prefs.getString("google_email", "") ?: ""
+        if (email.isNotEmpty()) uploadAvatarToServer(email)
     }
 
     private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -56,6 +61,7 @@ class ProfileFragment : Fragment() {
                 if (prefs.getString("profile_name", "").isNullOrEmpty()) {
                     nameInput?.setText(account.displayName ?: "")
                 }
+                val emailForUpload = account.email ?: ""
                 // Фото только если своего ещё нет
                 val photoUrl = account.photoUrl?.toString()
                 val existingAvatar = File(requireContext().filesDir, "avatar.jpg")
@@ -64,6 +70,7 @@ class ProfileFragment : Fragment() {
                         try {
                             val bmp = BitmapFactory.decodeStream(URL(photoUrl).openStream())
                             saveAvatarBitmap(bmp)
+                            if (emailForUpload.isNotEmpty()) uploadAvatarToServer(emailForUpload)
                             handler.post {
                                 if (!isAdded) return@post
                                 reloadAvatarBig()
@@ -72,6 +79,7 @@ class ProfileFragment : Fragment() {
                         } catch (_: Exception) {}
                     }.start()
                 }
+                restoreProfileFromServer(emailForUpload)
                 rebuildGoogleCard()
             } catch (e: ApiException) {
                 android.widget.Toast.makeText(
@@ -299,6 +307,11 @@ class ProfileFragment : Fragment() {
         val name = nameInput?.text?.toString()?.trim() ?: ""
         val desc = descInput?.text?.toString()?.trim() ?: ""
         prefs.edit().putString("profile_name", name).putString("profile_desc", desc).apply()
+        val email = prefs.getString("google_email", "") ?: ""
+        if (email.isNotEmpty() && name.isNotEmpty()) {
+            syncProfileToServer(email, name)
+            uploadAvatarToServer(email)
+        }
         btn.text = "✓ Сохранено"
         btn.postDelayed({
             if (!isAdded) return@postDelayed
@@ -362,5 +375,74 @@ class ProfileFragment : Fragment() {
                 LinearLayout.LayoutParams.MATCH_PARENT, 1
             ).also { it.topMargin = (24 * dp).toInt() }
         })
+    }
+
+    private fun syncProfileToServer(email: String, name: String) {
+        val url = serverUrl
+        Thread {
+            try {
+                val conn = URL("$url/profile").openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"; conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                conn.connectTimeout = 8000; conn.readTimeout = 8000
+                val safeEmail = email.replace("\"", "")
+                val safeName  = name.replace("\"", "").replace("\\", "")
+                val body = "{\"google_email\":\"$safeEmail\",\"display_name\":\"$safeName\"}".toByteArray(Charsets.UTF_8)
+                conn.outputStream.write(body)
+                conn.responseCode; conn.disconnect()
+            } catch (_: Exception) {}
+        }.start()
+    }
+
+    private fun uploadAvatarToServer(email: String) {
+        val url  = serverUrl
+        val name = prefs.getString("profile_name", "") ?: ""
+        val ctx  = context ?: return
+        Thread {
+            try {
+                val avatarFile = File(ctx.filesDir, "avatar.jpg")
+                if (!avatarFile.exists()) return@Thread
+                val boundary = "----Boundary${System.currentTimeMillis()}"
+                val conn = URL("$url/avatar").openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"; conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                conn.connectTimeout = 8000; conn.readTimeout = 8000
+                val out = conn.outputStream
+                if (name.isNotEmpty())
+                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"sender\"\r\n\r\n$name\r\n".toByteArray())
+                out.write("--$boundary\r\nContent-Disposition: form-data; name=\"google_email\"\r\n\r\n$email\r\n".toByteArray())
+                out.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"avatar.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".toByteArray())
+                out.write(avatarFile.readBytes())
+                out.write("\r\n--$boundary--\r\n".toByteArray())
+                out.flush(); conn.responseCode; conn.disconnect()
+            } catch (_: Exception) {}
+        }.start()
+    }
+
+    private fun restoreProfileFromServer(email: String) {
+        if (email.isEmpty()) return
+        val url = serverUrl
+        val ctx = context ?: return
+        Thread {
+            try {
+                val json = JSONObject(URL("$url/profile/$email").readText())
+                val serverName = json.optString("display_name", "")
+                if (serverName.isNotEmpty() && prefs.getString("profile_name", "").isNullOrEmpty()) {
+                    prefs.edit().putString("profile_name", serverName).apply()
+                    handler.post { if (isAdded) nameInput?.setText(serverName) }
+                }
+            } catch (_: Exception) {}
+            try {
+                if (!File(ctx.filesDir, "avatar.jpg").exists()) {
+                    val bytes = URL("$url/avatar/email/$email").readBytes()
+                    File(ctx.filesDir, "avatar.jpg").writeBytes(bytes)
+                    handler.post {
+                        if (!isAdded) return@post
+                        reloadAvatarBig()
+                        (activity as? MainActivity)?.reloadAvatar()
+                    }
+                }
+            } catch (_: Exception) {}
+        }.start()
     }
 }

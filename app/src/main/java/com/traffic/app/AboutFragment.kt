@@ -38,7 +38,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.18"
+        const val CURRENT_VERSION = "1.1.19"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
