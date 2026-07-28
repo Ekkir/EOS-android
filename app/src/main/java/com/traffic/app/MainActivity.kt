@@ -78,6 +78,13 @@ class MainActivity : AppCompatActivity(), SectionNavigator {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
             }
         }
+        EosFirebaseService.createNotificationChannel(this)
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
+                    .edit().putString("fcm_token", token).apply()
+                EosFirebaseService.sendTokenToServer(this)
+            }
 
         if (savedInstanceState == null) {
             val initTx = supportFragmentManager.beginTransaction()

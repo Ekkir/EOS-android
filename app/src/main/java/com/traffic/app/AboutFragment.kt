@@ -38,7 +38,7 @@ class AboutFragment : Fragment() {
     companion object {
         const val GITHUB_OWNER  = "Ekkir"
         const val GITHUB_REPO   = "EOS-android"
-        const val CURRENT_VERSION = "1.1.20"
+        const val CURRENT_VERSION = "1.1.21"
     }
 
     private val handler  = Handler(Looper.getMainLooper())
@@ -568,10 +568,8 @@ class AboutFragment : Fragment() {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun creatorCard(ctx: Context, t: ThemeDef, dp: Float): LinearLayout {
-        val avaSize    = (46 * dp).toInt()
-        val prefs      = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
-        val senderName = prefs.getString("profile_name", "")?.takeIf { it.isNotBlank() } ?: "Ekkir"
-        val srvUrl     = prefs.getString("server_url", "http://eos-traffic.ddns.net:5000")!!
+        val avaSize = (46 * dp).toInt()
+        val prefs   = ctx.getSharedPreferences("traffic_prefs", Context.MODE_PRIVATE)
 
         fun makePlaceholder(): Bitmap {
             val b = Bitmap.createBitmap(avaSize, avaSize, Bitmap.Config.ARGB_8888)
@@ -600,21 +598,8 @@ class AboutFragment : Fragment() {
 
         executor.execute {
             try {
-                val avatarFile = File(ctx.filesDir, "avatar.jpg")
-                if (avatarFile.exists()) {
-                    val boundary = "----Boundary${System.currentTimeMillis()}"
-                    val conn = URL("$srvUrl/avatar").openConnection() as HttpURLConnection
-                    conn.requestMethod = "POST"; conn.doOutput = true
-                    conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-                    conn.connectTimeout = 8000; conn.readTimeout = 8000
-                    val out = conn.outputStream
-                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"sender\"\r\n\r\n$senderName\r\n".toByteArray())
-                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"avatar.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".toByteArray())
-                    out.write(avatarFile.readBytes())
-                    out.write("\r\n--$boundary--\r\n".toByteArray())
-                    out.flush(); conn.responseCode; conn.disconnect()
-                }
-                val raw = BitmapFactory.decodeStream(URL("$srvUrl/avatar/$senderName").openStream())
+                val srvUrl = ServerUrlResolver.resolve(prefs)
+                val raw = BitmapFactory.decodeStream(URL("$srvUrl/avatar/Ekkir").openStream())
                 if (raw != null) {
                     val min = minOf(raw.width, raw.height)
                     val cropped = Bitmap.createBitmap(raw, (raw.width - min) / 2, (raw.height - min) / 2, min, min)
