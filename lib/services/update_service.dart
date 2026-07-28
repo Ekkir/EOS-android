@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
   static const currentVersion = '1.1.21';
@@ -8,23 +10,51 @@ class UpdateService {
   static const _releasesApi =
       'https://api.github.com/repos/Ekkir/EOS-android/releases/latest';
 
-  static Future<String?> fetchLatestVersion() async {
+  // Returns {'version': 'v1.1.22', 'apk_url': '...', 'notes': '...'}
+  // apk_url is null if release has no APK asset
+  static Future<Map<String, String?>?> fetchReleaseInfo() async {
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 8);
-      final req = await client.getUrl(Uri.parse(_releasesApi));
-      req.headers.set('User-Agent', 'EOS-App');
-      req.headers.set('Accept', 'application/vnd.github+json');
-      final resp = await req.close().timeout(const Duration(seconds: 10));
-      if (resp.statusCode == 200) {
-        final body = await resp.transform(const SystemEncoding().decoder).join();
-        final match = RegExp(r'"tag_name"\s*:\s*"([^"]+)"').firstMatch(body);
-        client.close();
-        return match?.group(1);
-      }
-      client.close();
+      final resp = await http.get(
+        Uri.parse(_releasesApi),
+        headers: {
+          'User-Agent': 'EOS-App',
+          'Accept': 'application/vnd.github+json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (resp.statusCode != 200) return null;
+
+      final body = resp.body;
+
+      final versionMatch = RegExp(r'"tag_name"\s*:\s*"([^"]+)"').firstMatch(body);
+      final version = versionMatch?.group(1);
+      if (version == null) return null;
+
+      // Find APK in assets array
+      String? apkUrl;
+      final assetsMatch = RegExp(
+        r'"browser_download_url"\s*:\s*"([^"]+\.apk)"',
+      ).firstMatch(body);
+      if (assetsMatch != null) apkUrl = assetsMatch.group(1);
+
+      // Extract release notes (body field)
+      final notesMatch = RegExp(
+        r'"body"\s*:\s*"((?:[^"\\]|\\.)*)"',
+      ).firstMatch(body);
+      final notes = notesMatch?.group(1)
+          ?.replaceAll(r'\n', '\n')
+          .replaceAll(r'\r', '')
+          .replaceAll(r'\"', '"');
+
+      return {'version': version, 'apk_url': apkUrl, 'notes': notes};
     } catch (_) {}
     return null;
+  }
+
+  // Convenience method for background task (only version string)
+  static Future<String?> fetchLatestVersion() async {
+    final info = await fetchReleaseInfo();
+    return info?['version'];
   }
 
   static bool isNewer(String remote, String local) {
@@ -39,5 +69,36 @@ class UpdateService {
       if (rv < lv) return false;
     }
     return false;
+  }
+
+  // Downloads APK, calls onProgress(0.0..1.0), returns saved file path
+  static Future<String?> downloadApk(
+    String url,
+    void Function(double progress) onProgress,
+  ) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final savePath = '${dir.path}/eos_update.apk';
+      final file = File(savePath);
+
+      final req = http.Request('GET', Uri.parse(url));
+      final resp = await req.send().timeout(const Duration(minutes: 5));
+      if (resp.statusCode != 200) return null;
+
+      final total = resp.contentLength ?? 0;
+      var received = 0;
+
+      final sink = file.openWrite();
+      await resp.stream.listen((chunk) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total > 0) onProgress(received / total);
+      }).asFuture<void>();
+      await sink.flush();
+      await sink.close();
+
+      return savePath;
+    } catch (_) {}
+    return null;
   }
 }

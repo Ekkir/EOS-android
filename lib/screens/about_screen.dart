@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
@@ -21,9 +22,16 @@ class _AboutScreenState extends State<AboutScreen>
 
   Uint8List? _creatorAvatar;
   bool _loadingAvatar = true;
-  bool _checkingUpdate = false;
+
+  // Update state
+  bool _checking = false;
+  bool _downloading = false;
+  double _downloadProgress = 0;
   String? _latestVersion;
+  String? _apkUrl;
+  String? _releaseNotes;
   bool? _updateAvailable;
+
   late AnimationController _shimmerCtrl;
   late Animation<double> _shimmerAnim;
 
@@ -56,15 +64,48 @@ class _AboutScreenState extends State<AboutScreen>
   }
 
   Future<void> _checkUpdate() async {
-    setState(() { _checkingUpdate = true; _updateAvailable = null; });
-    final version = await UpdateService.fetchLatestVersion();
-    if (mounted) {
-      setState(() {
-        _latestVersion = version;
-        _updateAvailable = version != null &&
-            UpdateService.isNewer(version, UpdateService.currentVersion);
-        _checkingUpdate = false;
-      });
+    setState(() { _checking = true; _updateAvailable = null; });
+    final info = await UpdateService.fetchReleaseInfo();
+    if (!mounted) return;
+    final version = info?['version'];
+    setState(() {
+      _latestVersion = version;
+      _apkUrl = info?['apk_url'];
+      _releaseNotes = info?['notes'];
+      _updateAvailable = version != null &&
+          UpdateService.isNewer(version, UpdateService.currentVersion);
+      _checking = false;
+    });
+  }
+
+  Future<void> _downloadAndInstall() async {
+    if (_apkUrl == null) {
+      // No APK attached to release — open release page instead
+      _openGithub();
+      return;
+    }
+
+    setState(() { _downloading = true; _downloadProgress = 0; });
+
+    final path = await UpdateService.downloadApk(_apkUrl!, (progress) {
+      if (mounted) setState(() => _downloadProgress = progress);
+    });
+
+    if (!mounted) return;
+    setState(() => _downloading = false);
+
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка скачивания. Попробуйте ещё раз.')),
+      );
+      return;
+    }
+
+    final result = await OpenFile.open(path, type: 'application/vnd.android.package-archive');
+    if (result.type != ResultType.done && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось открыть установщик: ${result.message}')),
+      );
     }
   }
 
@@ -122,7 +163,7 @@ class _AboutScreenState extends State<AboutScreen>
             ),
             const SizedBox(height: 24),
 
-            // Version + update check
+            // Version card
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -140,13 +181,13 @@ class _AboutScreenState extends State<AboutScreen>
                   ),
                   const Spacer(),
                   OutlinedButton(
-                    onPressed: _checkingUpdate ? null : _checkUpdate,
+                    onPressed: (_checking || _downloading) ? null : _checkUpdate,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: t.accent,
                       side: BorderSide(color: t.accent),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: _checkingUpdate
+                    child: _checking
                         ? SizedBox(width: 16, height: 16,
                             child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
                         : const Text('Проверить'),
@@ -155,30 +196,67 @@ class _AboutScreenState extends State<AboutScreen>
               ),
             ),
 
+            // Update available
             if (_updateAvailable == true) ...[
               const SizedBox(height: 8),
               GlassCard(
-                padding: const EdgeInsets.all(12),
-                child: Row(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.system_update, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
+                      children: [
+                        const Icon(Icons.system_update, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Text('Доступна версия $_latestVersion',
+                          style: const TextStyle(color: Colors.green,
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                      ],
+                    ),
+                    if (_releaseNotes != null && _releaseNotes!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(_releaseNotes!,
+                        style: TextStyle(color: t.textSecondary, fontSize: 13, height: 1.5)),
+                    ],
+                    const SizedBox(height: 14),
+                    if (_downloading) ...[
+                      Row(
                         children: [
-                          Text('Доступна версия $_latestVersion',
-                            style: const TextStyle(color: Colors.green,
-                                fontWeight: FontWeight.bold)),
-                          Text('Нажмите, чтобы скачать',
-                            style: TextStyle(color: Colors.green.shade300, fontSize: 12)),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _downloadProgress,
+                                backgroundColor: t.cardBorder,
+                                color: Colors.green,
+                                minHeight: 6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text('${(_downloadProgress * 100).toInt()}%',
+                            style: TextStyle(color: t.textSecondary, fontSize: 13)),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.download, color: Colors.green),
-                      onPressed: _openGithub,
-                    ),
+                    ] else ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _downloadAndInstall,
+                          icon: Icon(_apkUrl != null ? Icons.download : Icons.open_in_new),
+                          label: Text(_apkUrl != null
+                              ? 'Скачать и установить'
+                              : 'Открыть на GitHub'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -199,7 +277,7 @@ class _AboutScreenState extends State<AboutScreen>
 
             const SizedBox(height: 12),
 
-            // Info cards
+            // Tech stack
             GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
