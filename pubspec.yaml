@@ -1,7 +1,7 @@
 name: eos
 description: "EOS — Traffic Management System"
 publish_to: 'none'
-version: 1.1.88+90
+version: 1.1.89+91
 
 environment:
   sdk: ^3.12.2

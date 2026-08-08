@@ -1091,9 +1091,10 @@ class _MediaMessageWidgetState extends State<_MediaMessageWidget> {
             onTap: () => _openFullscreen(ctx, snap.data!),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 200, height: 150,
-                child: Image.memory(snap.data!, fit: BoxFit.cover, width: 200, height: 150),
+              child: Image.memory(
+                snap.data!,
+                width: 220,
+                fit: BoxFit.fitWidth,
               ),
             ),
           );
