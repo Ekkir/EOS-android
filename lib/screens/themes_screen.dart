@@ -121,6 +121,98 @@ class _ThemesScreenState extends State<ThemesScreen> {
             );
           }),
 
+          // Glass blur slider (liquidglass/glassy)
+          if (t.isLiquidGlass || t.glassy) ...[
+            const SizedBox(height: 8),
+            GlassCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.blur_on, color: notifier.accent, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Размытие стекла',
+                        style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+                      const Spacer(),
+                      Text(notifier.glassBlur.toStringAsFixed(1),
+                        style: TextStyle(color: notifier.accent, fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderThemeData(
+                      activeTrackColor: notifier.accent,
+                      inactiveTrackColor: t.cardBorder,
+                      thumbColor: notifier.accent,
+                      overlayColor: notifier.accent.withValues(alpha: 0.2),
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      value: notifier.glassBlur,
+                      min: 2.0,
+                      max: 14.0,
+                      onChanged: (v) => notifier.setGlassBlur(v),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Слабо', style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                      Text('Сильно', style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Cyberpunk scanline intensity slider
+          if (t.cyberpunk) ...[
+            const SizedBox(height: 8),
+            GlassCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.grid_4x4, color: notifier.accent, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Интенсивность сканлайнов',
+                        style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+                      const Spacer(),
+                      Text('${(notifier.scanlineOpacity * 200).toInt()}%',
+                        style: TextStyle(color: notifier.accent, fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderThemeData(
+                      activeTrackColor: notifier.accent,
+                      inactiveTrackColor: t.cardBorder,
+                      thumbColor: notifier.accent,
+                      overlayColor: notifier.accent.withValues(alpha: 0.2),
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      value: notifier.scanlineOpacity,
+                      min: 0.0,
+                      max: 0.5,
+                      onChanged: (v) => notifier.setScanlineOpacity(v),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Нет', style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                      Text('Ярко', style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Neon glow intensity slider
           if (t.neonGlow) ...[
             const SizedBox(height: 8),

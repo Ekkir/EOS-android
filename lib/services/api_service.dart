@@ -146,14 +146,56 @@ class ApiService {
 
   // ── Медиа ───────────────────────────────────────────────────────────────
 
-  Future<String?> uploadMedia(File file) async {
+  Future<String?> uploadMedia(File file, {void Function(double)? onProgress}) async {
     try {
-      final base   = await _base;
-      final req    = http.MultipartRequest('POST', Uri.parse('$base/media/upload'));
-      req.files.add(await http.MultipartFile.fromPath('file', file.path));
-      final resp   = await req.send().timeout(const Duration(seconds: 30));
-      final body   = await resp.stream.bytesToString();
-      if (resp.statusCode == 200) return (jsonDecode(body) as Map)['media_id'] as String?;
+      final base     = await _base;
+      final bytes    = await file.readAsBytes();
+      final total    = bytes.length;
+      final filename = file.path.split(RegExp(r'[/\\]')).last;
+
+      if (onProgress == null) {
+        final req = http.MultipartRequest('POST', Uri.parse('$base/media/upload'));
+        req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+        final resp = await req.send().timeout(const Duration(seconds: 60));
+        final body = await resp.stream.bytesToString();
+        if (resp.statusCode == 200) return (jsonDecode(body) as Map)['media_id'] as String?;
+      } else {
+        final boundary = 'EOS${DateTime.now().millisecondsSinceEpoch}';
+        final prefix = utf8.encode(
+          '--$boundary\r\nContent-Disposition: form-data; name="file"; '
+          'filename="$filename"\r\nContent-Type: application/octet-stream\r\n\r\n',
+        );
+        final suffix     = utf8.encode('\r\n--$boundary--\r\n');
+        final contentLen = prefix.length + total + suffix.length;
+
+        final client = http.Client();
+        try {
+          final req = http.StreamedRequest('POST', Uri.parse('$base/media/upload'))
+            ..headers['Content-Type'] = 'multipart/form-data; boundary=$boundary'
+            ..headers['Content-Length'] = '$contentLen';
+          final respFuture = client.send(req).timeout(const Duration(seconds: 60));
+
+          req.sink.add(prefix);
+          const chunkSize = 32768;
+          int sent = prefix.length;
+          for (var i = 0; i < total; i += chunkSize) {
+            final end = (i + chunkSize).clamp(0, total);
+            req.sink.add(bytes.sublist(i, end));
+            sent += end - i;
+            onProgress(sent / contentLen);
+            await Future.delayed(Duration.zero);
+          }
+          req.sink.add(suffix);
+          await req.sink.close();
+          onProgress(1.0);
+
+          final resp = await respFuture;
+          final body = await resp.stream.bytesToString();
+          if (resp.statusCode == 200) return (jsonDecode(body) as Map)['media_id'] as String?;
+        } finally {
+          client.close();
+        }
+      }
     } catch (_) {}
     return null;
   }

@@ -8,9 +8,10 @@ class CyberpunkScanlines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final opacity = context.watch<AppThemeNotifier>().scanlineOpacity;
     return IgnorePointer(
       child: CustomPaint(
-        painter: _ScanlinesPainter(),
+        painter: _ScanlinesPainter(opacity),
         size: Size.infinite,
       ),
     );
@@ -18,10 +19,14 @@ class CyberpunkScanlines extends StatelessWidget {
 }
 
 class _ScanlinesPainter extends CustomPainter {
+  final double opacity;
+  const _ScanlinesPainter(this.opacity);
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (opacity <= 0) return;
     final paint = Paint()
-      ..color = const Color(0x1A000000)
+      ..color = Color.fromARGB((opacity * 255).round().clamp(0, 255), 0, 0, 0)
       ..style = PaintingStyle.fill;
     for (double y = 0; y < size.height; y += 4) {
       canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1.5), paint);
@@ -29,7 +34,7 @@ class _ScanlinesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_ScanlinesPainter old) => old.opacity != opacity;
 }
 
 class GlassSurface extends StatelessWidget {

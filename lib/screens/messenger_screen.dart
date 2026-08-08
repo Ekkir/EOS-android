@@ -65,6 +65,9 @@ class _MessengerScreenState extends State<MessengerScreen> {
   // IDs shown without animation (history preload)
   final Set<int> _preloadedIds = {};
 
+  // Upload progress (null = not uploading)
+  double? _uploadProgress;
+
   @override
   void initState() {
     super.initState();
@@ -320,6 +323,11 @@ class _MessengerScreenState extends State<MessengerScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
+  bool _isRead(Message m) {
+    if (m.sender != _myName) return false;
+    return _messages.any((o) => o.id > m.id && o.sender != _myName);
+  }
+
   Future<void> _stopVoiceRecording() async {
     if (!_isRecording) return;
     _stopRecordingTimer();
@@ -335,8 +343,12 @@ class _MessengerScreenState extends State<MessengerScreen> {
       final api = context.read<ApiService>();
       final sender = _resolveSenderName(prefs);
 
-      setState(() => _sending = true);
-      final mediaId = await api.uploadMedia(file);
+      setState(() { _sending = true; _uploadProgress = 0.0; });
+      final mediaId = await api.uploadMedia(
+        file,
+        onProgress: (p) { if (mounted) setState(() => _uploadProgress = p); },
+      );
+      if (mounted) setState(() => _uploadProgress = null);
       if (mediaId != null && mounted) {
         await api.sendMessage(
           channel: widget.channel.id,
@@ -366,8 +378,12 @@ class _MessengerScreenState extends State<MessengerScreen> {
     final api = context.read<ApiService>();
     final sender = _resolveSenderName(prefs);
 
-    setState(() => _sending = true);
-    final mediaId = await api.uploadMedia(File(path));
+    setState(() { _sending = true; _uploadProgress = 0.0; });
+    final mediaId = await api.uploadMedia(
+      File(path),
+      onProgress: (p) { if (mounted) setState(() => _uploadProgress = p); },
+    );
+    if (mounted) setState(() => _uploadProgress = null);
     if (mediaId != null && mounted) {
       await api.sendMessage(
         channel: widget.channel.id,
@@ -428,8 +444,12 @@ class _MessengerScreenState extends State<MessengerScreen> {
     final api = context.read<ApiService>();
     final sender = _resolveSenderName(prefs);
 
-    setState(() => _sending = true);
-    final mediaId = await api.uploadMedia(File(xfile.path));
+    setState(() { _sending = true; _uploadProgress = 0.0; });
+    final mediaId = await api.uploadMedia(
+      File(xfile.path),
+      onProgress: (p) { if (mounted) setState(() => _uploadProgress = p); },
+    );
+    if (mounted) setState(() => _uploadProgress = null);
     if (mediaId != null && mounted) {
       await api.sendMessage(
         channel: widget.channel.id,
@@ -467,8 +487,12 @@ class _MessengerScreenState extends State<MessengerScreen> {
     final api = context.read<ApiService>();
     final sender = _resolveSenderName(prefs);
 
-    setState(() => _sending = true);
-    final mediaId = await api.uploadMedia(file);
+    setState(() { _sending = true; _uploadProgress = 0.0; });
+    final mediaId = await api.uploadMedia(
+      file,
+      onProgress: (p) { if (mounted) setState(() => _uploadProgress = p); },
+    );
+    if (mounted) setState(() => _uploadProgress = null);
     if (mediaId != null && mounted) {
       await api.sendMessage(
         channel: widget.channel.id,
@@ -710,6 +734,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
                         child: _MessageBubble(
                           message: msg,
                           isMe: isMe,
+                          isRead: _isRead(msg),
                           theme: t,
                           timeStr: _formatTime(msg.ts),
                           avatarBytes: _avatarCache[msg.sender],
@@ -730,6 +755,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
             controller: _inputCtrl,
             theme: t,
             sending: _sending,
+            uploadProgress: _uploadProgress,
             isRecording: _isRecording,
             videoMode: _videoMode,
             recordingLocked: _recordingLocked,
@@ -1136,6 +1162,7 @@ class _MediaMessageWidgetState extends State<_MediaMessageWidget> {
 class _MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
+  final bool isRead;
   final ThemeDef theme;
   final String timeStr;
   final Uint8List? avatarBytes;
@@ -1150,6 +1177,7 @@ class _MessageBubble extends StatelessWidget {
     super.key,
     required this.message,
     required this.isMe,
+    required this.isRead,
     required this.theme,
     required this.timeStr,
     this.avatarBytes,
@@ -1163,6 +1191,7 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent  = context.read<AppThemeNotifier>().accent;
     final isCircle = message.type == 'video_circle';
     final isImage = message.type == 'image' && loadMedia != null;
     final isGlass = theme.isLiquidGlass || theme.glassy;
@@ -1170,7 +1199,7 @@ class _MessageBubble extends StatelessWidget {
         ? (isMe
             ? const Color(0xFF4488FF).withValues(alpha: 0.20)
             : Colors.white.withValues(alpha: 0.09))
-        : (isMe ? theme.accent.withValues(alpha: 0.85) : theme.surface);
+        : (isMe ? accent.withValues(alpha: 0.85) : theme.surface);
     final textColor = isMe ? Colors.white : theme.textPrimary;
 
     final borderRadius = BorderRadius.only(
@@ -1192,7 +1221,7 @@ class _MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 6, right: 12, bottom: 2),
                 child: Text(message.sender,
-                  style: TextStyle(color: theme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             if (message.replyToId != null && message.replyToText != null)
               Container(
@@ -1200,7 +1229,7 @@ class _MessageBubble extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.10),
-                  border: Border(left: BorderSide(color: theme.accent, width: 3)),
+                  border: Border(left: BorderSide(color: accent, width: 3)),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(message.replyToText!,
@@ -1237,7 +1266,7 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (!isMe)
             Text(message.sender,
-              style: TextStyle(color: theme.accent, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           if (message.replyToId != null && message.replyToText != null) ...[
             Container(
@@ -1245,7 +1274,7 @@ class _MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.10),
-                border: Border(left: BorderSide(color: theme.accent, width: 3)),
+                border: Border(left: BorderSide(color: accent, width: 3)),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -1276,6 +1305,14 @@ class _MessageBubble extends StatelessWidget {
                 const SizedBox(width: 4),
               ],
               Text(timeStr, style: TextStyle(color: tsColor, fontSize: 11)),
+              if (isMe) ...[
+                const SizedBox(width: 3),
+                Icon(
+                  isRead ? Icons.done_all : Icons.check,
+                  size: 13,
+                  color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                ),
+              ],
             ],
           ),
         ],
@@ -1377,6 +1414,7 @@ class _InputBar extends StatefulWidget {
   final TextEditingController controller;
   final ThemeDef theme;
   final bool sending;
+  final double? uploadProgress;
   final bool isRecording;
   final bool videoMode;
   final bool recordingLocked;
@@ -1397,6 +1435,7 @@ class _InputBar extends StatefulWidget {
     required this.controller,
     required this.theme,
     required this.sending,
+    this.uploadProgress,
     required this.isRecording,
     required this.videoMode,
     required this.recordingLocked,
@@ -1423,23 +1462,24 @@ class _InputBarState extends State<_InputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final w = widget;
+    final w      = widget;
+    final accent = context.read<AppThemeNotifier>().accent;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (w.replyingTo != null)
           Container(
-            color: w.theme.accent.withValues(alpha: 0.10),
+            color: accent.withValues(alpha: 0.10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: [
-                Container(width: 3, height: 32, color: w.theme.accent),
+                Container(width: 3, height: 32, color: accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(w.replyingTo!.sender, style: TextStyle(color: w.theme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(w.replyingTo!.sender, style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w600)),
                       Text(w.replyingTo!.text, style: TextStyle(color: w.theme.textSecondary, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
@@ -1450,13 +1490,13 @@ class _InputBarState extends State<_InputBar> {
           ),
         if (w.editingMessage != null)
           Container(
-            color: w.theme.accent.withValues(alpha: 0.10),
+            color: accent.withValues(alpha: 0.10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: [
-                Icon(Icons.edit, size: 16, color: w.theme.accent),
+                Icon(Icons.edit, size: 16, color: accent),
                 const SizedBox(width: 8),
-                Expanded(child: Text('Редактирование', style: TextStyle(color: w.theme.accent, fontSize: 13))),
+                Expanded(child: Text('Редактирование', style: TextStyle(color: accent, fontSize: 13))),
                 IconButton(icon: Icon(Icons.close, size: 18, color: w.theme.textSecondary), onPressed: w.onCancelEdit, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
               ],
             ),
@@ -1541,32 +1581,42 @@ class _InputBarState extends State<_InputBar> {
                       decoration: BoxDecoration(
                         color: w.isRecording
                             ? Colors.redAccent
-                            : w.theme.accent.withValues(alpha: 0.15),
+                            : accent.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         w.isRecording
                             ? (w.recordingLocked ? Icons.lock : Icons.mic)
                             : (w.videoMode ? Icons.videocam : Icons.mic),
-                        color: w.isRecording ? Colors.white : w.theme.accent,
+                        color: w.isRecording ? Colors.white : accent,
                         size: 20,
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  w.sending
+                  w.uploadProgress != null
                       ? SizedBox(
-                          width: 36, height: 36,
-                          child: CircularProgressIndicator(color: w.theme.accent, strokeWidth: 2),
-                        )
-                      : GestureDetector(
-                          onTap: w.onSend,
-                          child: Container(
-                            width: 42, height: 42,
-                            decoration: BoxDecoration(color: w.theme.accent, shape: BoxShape.circle),
-                            child: const Icon(Icons.send, color: Colors.white, size: 20),
+                          width: 42, height: 42,
+                          child: CircularProgressIndicator(
+                            value: w.uploadProgress,
+                            color: accent,
+                            strokeWidth: 3,
+                            backgroundColor: accent.withValues(alpha: 0.2),
                           ),
-                        ),
+                        )
+                      : w.sending
+                          ? SizedBox(
+                              width: 36, height: 36,
+                              child: CircularProgressIndicator(color: accent, strokeWidth: 2),
+                            )
+                          : GestureDetector(
+                              onTap: w.onSend,
+                              child: Container(
+                                width: 42, height: 42,
+                                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                                child: const Icon(Icons.send, color: Colors.white, size: 20),
+                              ),
+                            ),
                 ],
               ),
               // Lock indicator: плавающий замок над кнопкой микрофона при записи

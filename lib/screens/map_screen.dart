@@ -51,11 +51,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _fetchLocations();
     });
     _requestLocationPermission();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreLocationSharing());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreLocationSharing();
+      if (mounted) context.read<AppThemeNotifier>().setSuppressScanlines(true);
+    });
   }
 
   @override
   void dispose() {
+    context.read<AppThemeNotifier>().setSuppressScanlines(false);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _locationSub?.cancel();

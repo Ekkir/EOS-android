@@ -27,10 +27,11 @@ class GlassCard extends StatelessWidget {
     Widget content;
 
     if (t.isLiquidGlass || t.glassy) {
+      final blur = notifier.glassBlur;
       content = ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.04),

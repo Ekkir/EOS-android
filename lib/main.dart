@@ -267,7 +267,7 @@ class EosApp extends StatelessWidget {
         return Stack(
           children: [
             child!,
-            if (notifier.current.cyberpunk)
+            if (notifier.current.cyberpunk && !notifier.suppressScanlines)
               const Positioned.fill(child: CyberpunkScanlines()),
             const DownloadRingOverlay(),
           ],

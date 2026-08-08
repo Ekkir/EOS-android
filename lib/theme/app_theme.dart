@@ -94,12 +94,18 @@ class AppThemeNotifier extends ChangeNotifier {
   ThemeDef _current = themes[0];
   Color? _customAccent;
   Color? _customAccent2;
-  double _glowIntensity = 1.0;
+  double _glowIntensity   = 1.0;
+  double _glassBlur       = 6.0;
+  double _scanlineOpacity = 0.10;
+  bool   _suppressScanlines = false;
 
   ThemeDef get current => _current;
-  Color get accent  => _customAccent  ?? _current.accent;
-  Color get accent2 => _customAccent2 ?? _current.accent2;
-  double get glowIntensity => _glowIntensity;
+  Color  get accent   => _customAccent  ?? _current.accent;
+  Color  get accent2  => _customAccent2 ?? _current.accent2;
+  double get glowIntensity    => _glowIntensity;
+  double get glassBlur        => _glassBlur;
+  double get scanlineOpacity  => _scanlineOpacity;
+  bool   get suppressScanlines => _suppressScanlines;
 
   static String _toHex(Color c) =>
       '#${c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
@@ -115,7 +121,9 @@ class AppThemeNotifier extends ChangeNotifier {
     final h2 = prefs.getString('accent2_$id');
     if (h1 != null) _customAccent  = _fromHex(h1);
     if (h2 != null) _customAccent2 = _fromHex(h2);
-    _glowIntensity = prefs.getDouble('glow_intensity') ?? 1.0;
+    _glowIntensity   = prefs.getDouble('glow_intensity')    ?? 1.0;
+    _glassBlur       = prefs.getDouble('glass_blur')        ?? 6.0;
+    _scanlineOpacity = prefs.getDouble('scanline_opacity')  ?? 0.10;
     notifyListeners();
   }
 
@@ -139,8 +147,25 @@ class AppThemeNotifier extends ChangeNotifier {
 
   Future<void> setGlowIntensity(double v) async {
     _glowIntensity = v.clamp(0.3, 2.5);
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setDouble('glow_intensity', _glowIntensity);
+    (await SharedPreferences.getInstance()).setDouble('glow_intensity', _glowIntensity);
+    notifyListeners();
+  }
+
+  Future<void> setGlassBlur(double v) async {
+    _glassBlur = v.clamp(2.0, 14.0);
+    (await SharedPreferences.getInstance()).setDouble('glass_blur', _glassBlur);
+    notifyListeners();
+  }
+
+  Future<void> setScanlineOpacity(double v) async {
+    _scanlineOpacity = v.clamp(0.0, 0.5);
+    (await SharedPreferences.getInstance()).setDouble('scanline_opacity', _scanlineOpacity);
+    notifyListeners();
+  }
+
+  void setSuppressScanlines(bool v) {
+    if (_suppressScanlines == v) return;
+    _suppressScanlines = v;
     notifyListeners();
   }
 }

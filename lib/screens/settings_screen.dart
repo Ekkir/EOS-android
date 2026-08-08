@@ -126,10 +126,11 @@ class _SettingTile extends StatelessWidget {
 
     Widget card;
     if (t.isLiquidGlass || t.glassy) {
+      final blur = context.read<AppThemeNotifier>().glassBlur;
       card = ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
