@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_surface.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -90,7 +91,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: GlassBg(child: _loading
           ? Center(child: CircularProgressIndicator(color: t.accent))
           : ListView(
               padding: const EdgeInsets.all(12),
@@ -132,7 +133,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
                   ),
               ],
-            ),
+            )),
     );
   }
 }
@@ -141,6 +142,28 @@ class _StatCard extends StatelessWidget {
   final Map<String, dynamic> stats;
   final ThemeDef theme;
   const _StatCard({required this.stats, required this.theme});
+
+  static const _labels = <String, String>{
+    'uptime':           'Аптайм',
+    'connections':      'Соединений',
+    'messages':         'Сообщений',
+    'messages_total':   'Всего сообщений',
+    'users':            'Пользователей',
+    'clients':          'Клиентов',
+    'channels':         'Каналов',
+    'fcm_tokens':       'FCM токенов',
+    'media_files':      'Медиафайлов',
+    'requests':         'Запросов',
+    'requests_total':   'Запросов всего',
+    'memory':           'Память',
+    'cpu':              'CPU',
+    'version':          'Версия',
+    'started':          'Запущен',
+    'lights_requests':  'Запросов светофоров',
+    'errors':           'Ошибок',
+    'active_channels':  'Активных каналов',
+    'online':           'Онлайн',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +188,7 @@ class _StatCard extends StatelessWidget {
                 children: [
                   Text('${e.value}',
                     style: TextStyle(color: theme.accent, fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(e.key,
+                  Text(_labels[e.key] ?? e.key,
                     style: TextStyle(color: theme.textSecondary, fontSize: 11)),
                 ],
               ),

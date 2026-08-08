@@ -1,13 +1,16 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/download_state.dart';
 import '../services/update_service.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_surface.dart';
+import '../widgets/glitch_wrapper.dart';
 import '../widgets/circular_avatar.dart';
+import '../widgets/gradient_progress_bar.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -38,8 +41,8 @@ class _AboutScreenState extends State<AboutScreen>
   @override
   void initState() {
     super.initState();
-    _shimmerCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
-      ..repeat();
+    _shimmerCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 3))
+      ..repeat(reverse: true);
     _shimmerAnim = Tween<double>(begin: -1.5, end: 1.5).animate(
       CurvedAnimation(parent: _shimmerCtrl, curve: Curves.easeInOut),
     );
@@ -79,19 +82,34 @@ class _AboutScreenState extends State<AboutScreen>
   }
 
   Future<void> _downloadAndInstall() async {
-    if (_apkUrl == null) {
-      // No APK attached to release — open release page instead
+    if (_apkUrl == null || _latestVersion == null) {
       _openGithub();
       return;
     }
 
-    setState(() { _downloading = true; _downloadProgress = 0; });
+    // Check cache first
+    final cached = await UpdateService.getCachedApk(_latestVersion!);
+    if (cached != null) {
+      UpdateService.installApk(cached);
+      return;
+    }
 
-    final path = await UpdateService.downloadApk(_apkUrl!, (progress) {
-      if (mounted) setState(() => _downloadProgress = progress);
+    setState(() { _downloading = true; _downloadProgress = 0; });
+    final dlState = context.read<DownloadState>();
+    dlState.startDownload();
+
+    final path = await UpdateService.downloadApk(_apkUrl!, _latestVersion!, (progress, r, t) {
+      try { if (mounted) setState(() => _downloadProgress = progress); } catch (_) {}
+      dlState.onProgress(progress, r, t);
     });
 
-    if (!mounted) return;
+    dlState.complete(path);
+
+    if (!mounted) {
+      if (path != null) UpdateService.installApk(path);
+      return;
+    }
+
     setState(() => _downloading = false);
 
     if (path == null) {
@@ -101,12 +119,7 @@ class _AboutScreenState extends State<AboutScreen>
       return;
     }
 
-    final result = await OpenFile.open(path, type: 'application/vnd.android.package-archive');
-    if (result.type != ResultType.done && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось открыть установщик: ${result.message}')),
-      );
-    }
+    UpdateService.installApk(path);
   }
 
   Future<void> _openGithub() async {
@@ -126,40 +139,24 @@ class _AboutScreenState extends State<AboutScreen>
             style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
-      body: SingleChildScrollView(
+      body: GlassBg(child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             const SizedBox(height: 16),
 
-            // Logo shimmer
-            AnimatedBuilder(
-              animation: _shimmerAnim,
-              builder: (ctx, child) => ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  begin: Alignment(_shimmerAnim.value - 1, 0),
-                  end: Alignment(_shimmerAnim.value, 0),
-                  colors: [
-                    t.accent.withValues(alpha: 0.4),
-                    t.accent,
-                    t.accent.withValues(alpha: 0.4),
-                  ],
-                ).createShader(bounds),
-                child: child,
-              ),
-              child: const Text('EOS',
+            // Logo glitch
+            GlitchWrapper(
+              intensity: 0.55,
+              frequency: 0.7,
+              child: Text('EOS',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: t.accent,
                   fontSize: 64,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 8,
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text('Emergency Operations System',
-              style: TextStyle(color: t.textSecondary, fontSize: 13, letterSpacing: 1),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
 
@@ -180,17 +177,28 @@ class _AboutScreenState extends State<AboutScreen>
                     ],
                   ),
                   const Spacer(),
-                  OutlinedButton(
-                    onPressed: (_checking || _downloading) ? null : _checkUpdate,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.accent,
-                      side: BorderSide(color: t.accent),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  AnimatedBuilder(
+                    animation: _shimmerAnim,
+                    builder: (_, _) => OutlinedButton(
+                      onPressed: (_checking || _downloading) ? null : _checkUpdate,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: t.accent,
+                        side: BorderSide(color: t.accent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: _checking
+                          ? SizedBox(width: 16, height: 16,
+                              child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
+                          : ShaderMask(
+                              shaderCallback: (bounds) => LinearGradient(
+                                begin: Alignment(_shimmerAnim.value - 1, 0),
+                                end: Alignment(_shimmerAnim.value + 1, 0),
+                                colors: [t.accent, Colors.white, t.accent],
+                              ).createShader(bounds),
+                              blendMode: BlendMode.srcIn,
+                              child: const Text('Проверить'),
+                            ),
                     ),
-                    child: _checking
-                        ? SizedBox(width: 16, height: 16,
-                            child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
-                        : const Text('Проверить'),
                   ),
                 ],
               ),
@@ -223,14 +231,10 @@ class _AboutScreenState extends State<AboutScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: _downloadProgress,
-                                backgroundColor: t.cardBorder,
-                                color: Colors.green,
-                                minHeight: 6,
-                              ),
+                            child: GradientProgressBar(
+                              value: _downloadProgress,
+                              height: 6,
+                              background: t.cardBorder,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -284,11 +288,38 @@ class _AboutScreenState extends State<AboutScreen>
                 children: [
                   _InfoRow(icon: Icons.code, label: 'Язык', value: 'Dart / Flutter', t: t),
                   Divider(color: t.cardBorder, height: 16),
-                  _InfoRow(icon: Icons.phone_android, label: 'Платформа', value: 'Android', t: t),
+                  _InfoRow(icon: Icons.phone_android, label: 'Платформа', value: 'Android', t: t, valueIcon: Icons.android),
                   Divider(color: t.cardBorder, height: 16),
                   _InfoRow(icon: Icons.map, label: 'Карта', value: 'OpenStreetMap', t: t),
                   Divider(color: t.cardBorder, height: 16),
                   _InfoRow(icon: Icons.notifications, label: 'Push', value: 'Firebase FCM', t: t),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // GitHub
+            GlassCard(
+              onTap: _openGithub,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.code, color: t.accent, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Исходный код',
+                          style: TextStyle(color: t.textPrimary,
+                              fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('github.com/Ekkir/EOS-android',
+                          style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.open_in_new, color: t.textSecondary, size: 18),
                 ],
               ),
             ),
@@ -320,33 +351,12 @@ class _AboutScreenState extends State<AboutScreen>
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.open_in_new, color: t.accent),
-                    onPressed: _openGithub,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            GlassCard(
-              onTap: _openGithub,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(Icons.source, color: t.accent),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Исходный код на GitHub',
-                      style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w500)),
-                  ),
-                  Icon(Icons.chevron_right, color: t.textSecondary),
                 ],
               ),
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }
@@ -356,8 +366,9 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final ThemeDef t;
+  final IconData? valueIcon;
 
-  const _InfoRow({required this.icon, required this.label, required this.value, required this.t});
+  const _InfoRow({required this.icon, required this.label, required this.value, required this.t, this.valueIcon});
 
   @override
   Widget build(BuildContext context) {
@@ -367,6 +378,10 @@ class _InfoRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(label, style: TextStyle(color: t.textSecondary, fontSize: 14)),
         const Spacer(),
+        if (valueIcon != null) ...[
+          Icon(valueIcon, color: t.textPrimary, size: 16),
+          const SizedBox(width: 6),
+        ],
         Text(value,
           style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
       ],

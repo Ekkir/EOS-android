@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/prefs_service.dart';
 import '../services/server_url_resolver.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_surface.dart';
 
 class ConnectionScreen extends StatefulWidget {
   const ConnectionScreen({super.key});
@@ -70,7 +71,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         title: Text('Подключение', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
-      body: ListView(
+      body: GlassBg(child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           GlassCard(
@@ -158,7 +159,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             ),
           ],
         ],
-      ),
+      )),
     );
   }
 

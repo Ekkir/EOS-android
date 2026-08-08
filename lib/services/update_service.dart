@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
-  static const currentVersion = '1.1.21';
+  static const currentVersion = '1.1.86';
+  static const _installerChannel = MethodChannel('com.traffic.app/installer');
   static const taskName = 'eos_update_check';
   static const notifChannelId = 'eos_updates';
   static const notifChannelName = 'Обновления';
@@ -71,16 +75,120 @@ class UpdateService {
     return false;
   }
 
-  // Downloads APK, calls onProgress(0.0..1.0), returns saved file path
+  // Installs APK. Returns null on success, 'NO_PERMISSION:<path>' if permission needed, error message on other errors.
+  static Future<String?> installApk(String path) async {
+    try {
+      final result = await _installerChannel.invokeMethod<bool>('installApk', {'path': path});
+      if (result == true) return null;
+      // Нативный канал вернул не-true — пробуем OpenFile
+    } on PlatformException catch (e) {
+      if (e.code == 'NO_INSTALL_PERMISSION') return 'NO_PERMISSION:${e.message}';
+      // Нативная ошибка — OpenFile как запасной вариант
+      try {
+        await OpenFile.open(path, type: 'application/vnd.android.package-archive');
+        return null;
+      } catch (_) {}
+      return e.message ?? 'Ошибка установки';
+    } catch (e) {
+      // Не-нативная ошибка — OpenFile как запасной вариант
+      try {
+        await OpenFile.open(path, type: 'application/vnd.android.package-archive');
+        return null;
+      } catch (_) {}
+      return e.toString();
+    }
+    // Fallback после non-true результата
+    try {
+      await OpenFile.open(path, type: 'application/vnd.android.package-archive');
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  // Единая обработка ошибок установки — используется из home_screen и download_ring.
+  // err: строка из installApk (null = успех, 'NO_PERMISSION:<path>' = нет разрешения).
+  static void handleInstallError(BuildContext context, String err) {
+    if (!context.mounted) return;
+    if (err.startsWith('NO_PERMISSION:')) {
+      final apkPath = err.substring('NO_PERMISSION:'.length);
+      showDialog<void>(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          title: const Text('Разрешение на установку'),
+          content: const Text(
+            'Включите "Установка из неизвестных источников" для EOS '
+            'в открывшихся настройках, затем вернитесь и нажмите "Установить".',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dCtx);
+                final err2 = await installApk(apkPath);
+                if (err2 != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка установки: $err2')),
+                  );
+                }
+              },
+              child: const Text('Установить'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка установки: $err')),
+      );
+    }
+  }
+
+  static Future<String> _cacheDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return dir.path;
+  }
+
+  static String _apkFilename(String version) =>
+      'eos_update_${version.replaceAll('.', '_')}.apk';
+
+  // Returns path to a cached APK for this version, or null if not cached / incomplete
+  static Future<String?> getCachedApk(String version) async {
+    try {
+      final path = '${await _cacheDir()}/${_apkFilename(version)}';
+      final f = File(path);
+      if (await f.exists() && await f.length() >= 5 * 1024 * 1024) return path;
+    } catch (_) {}
+    return null;
+  }
+
+  // Deletes cached APKs for versions other than the given one
+  static Future<void> clearOldCache(String keepVersion) async {
+    try {
+      final dir = Directory(await _cacheDir());
+      await for (final f in dir.list()) {
+        if (f is File &&
+            f.path.contains('eos_update_') &&
+            !f.path.contains(_apkFilename(keepVersion))) {
+          await f.delete();
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Downloads APK, calls onProgress(0.0..1.0, receivedBytes, totalBytes), returns saved file path
   static Future<String?> downloadApk(
     String url,
-    void Function(double progress) onProgress,
+    String version,
+    void Function(double progress, int received, int total) onProgress,
   ) async {
+    final savePath = '${await _cacheDir()}/${_apkFilename(version)}';
+    final file = File(savePath);
+    IOSink? sink;
     try {
-      final dir = await getTemporaryDirectory();
-      final savePath = '${dir.path}/eos_update.apk';
-      final file = File(savePath);
-
       final req = http.Request('GET', Uri.parse(url));
       final resp = await req.send().timeout(const Duration(minutes: 5));
       if (resp.statusCode != 200) return null;
@@ -88,17 +196,33 @@ class UpdateService {
       final total = resp.contentLength ?? 0;
       var received = 0;
 
-      final sink = file.openWrite();
+      sink = file.openWrite();
       await resp.stream.listen((chunk) {
-        sink.add(chunk);
+        sink!.add(chunk);
         received += chunk.length;
-        if (total > 0) onProgress(received / total);
+        if (total > 0) onProgress(received / total, received, total);
       }).asFuture<void>();
       await sink.flush();
       await sink.close();
+      sink = null;
 
+      // Если сервер передал Content-Length — проверяем что скачали всё
+      if (total > 0 && received < total) {
+        try { await file.delete(); } catch (_) {}
+        return null;
+      }
+      // Минимальный размер APK — 5 МБ
+      if (await file.length() < 5 * 1024 * 1024) {
+        try { await file.delete(); } catch (_) {}
+        return null;
+      }
+
+      await clearOldCache(version);
       return savePath;
-    } catch (_) {}
-    return null;
+    } catch (_) {
+      try { await sink?.close(); } catch (_) {}
+      try { if (await file.exists()) await file.delete(); } catch (_) {}
+      return null;
+    }
   }
 }

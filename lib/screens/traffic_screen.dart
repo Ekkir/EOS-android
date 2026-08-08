@@ -6,6 +6,8 @@ import '../services/api_service.dart';
 import '../models/traffic_state.dart';
 import '../widgets/road_map_widget.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_surface.dart';
+import 'calibration_screen.dart';
 
 class TrafficScreen extends StatefulWidget {
   const TrafficScreen({super.key});
@@ -66,15 +68,21 @@ class _TrafficScreenState extends State<TrafficScreen> {
         actions: [
           if (_loading)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 width: 20, height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2, color: t.accent),
               ),
             ),
+          IconButton(
+            icon: Icon(Icons.tune, color: t.textSecondary),
+            tooltip: 'Калибровка',
+            onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const CalibrationScreen())),
+          ),
         ],
       ),
-      body: Column(
+      body: GlassBg(child: Column(
         children: [
           if (_error)
             Container(
@@ -104,7 +112,7 @@ class _TrafficScreenState extends State<TrafficScreen> {
               child: _StatusCards(snapshot: _snapshot!, theme: t),
             ),
         ],
-      ),
+      )),
     );
   }
 

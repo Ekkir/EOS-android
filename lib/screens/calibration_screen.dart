@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_surface.dart';
 
 class CalibrationScreen extends StatefulWidget {
   const CalibrationScreen({super.key});
@@ -94,7 +95,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
         title: Text('Калибровка', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
-      body: _loading
+      body: GlassBg(child: _loading
           ? Center(child: CircularProgressIndicator(color: t.accent))
           : ListView(
               padding: const EdgeInsets.all(16),
@@ -121,7 +122,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   ),
                 ),
               ],
-            ),
+            )),
     );
   }
 }

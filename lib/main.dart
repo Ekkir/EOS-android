@@ -4,15 +4,23 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'theme/app_theme.dart';
+import 'services/download_state.dart';
 import 'services/prefs_service.dart';
 import 'services/api_service.dart';
 import 'services/update_service.dart';
+import 'providers/vpn_provider.dart';
+import 'widgets/download_ring.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 
-final FlutterLocalNotificationsPlugin _localNotif = FlutterLocalNotificationsPlugin();
+final FlutterLocalNotificationsPlugin localNotifPlugin = FlutterLocalNotificationsPlugin();
+
+// Текущий открытый канал — для фильтрации уведомлений
+String? currentChatChannelId;
 
 // ── Workmanager background entry point ──────────────────────────────────────
 
@@ -28,7 +36,7 @@ void callbackDispatcher() {
       final notif = FlutterLocalNotificationsPlugin();
       await notif.initialize(
         const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          android: AndroidInitializationSettings('ic_notification'),
         ),
       );
       await notif.show(
@@ -41,7 +49,6 @@ void callbackDispatcher() {
             UpdateService.notifChannelName,
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
-            icon: '@mipmap/ic_launcher',
           ),
         ),
       );
@@ -55,6 +62,29 @@ void callbackDispatcher() {
 @pragma('vm:entry-point')
 Future<void> _onBackgroundMessage(RemoteMessage message) async {
   await Firebase.initializeApp();
+  final title = message.notification?.title ?? message.data['sender'] ?? 'EOS';
+  final body  = message.notification?.body  ?? message.data['text']   ?? '';
+  if (body.isEmpty) return;
+  final channel = message.data['channel'] ?? '';
+  final sp = await SharedPreferences.getInstance();
+  final muted = sp.getStringList('muted_channels') ?? [];
+  if (channel.isNotEmpty && muted.contains(channel)) return;
+  final notif = FlutterLocalNotificationsPlugin();
+  await notif.initialize(const InitializationSettings(
+    android: AndroidInitializationSettings('ic_notification'),
+  ));
+  await notif.show(
+    message.hashCode,
+    title,
+    body,
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'eos_chat', 'Чат',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    ),
+  );
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -66,33 +96,68 @@ Future<void> main() async {
   await Firebase.initializeApp();
 
   // Local notifications setup
-  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  await _localNotif.initialize(
-    const InitializationSettings(android: androidSettings),
-  );
+  try {
+    const androidSettings = AndroidInitializationSettings('ic_notification');
+    await localNotifPlugin.initialize(
+      const InitializationSettings(android: androidSettings),
+    );
+    final androidPlugin = localNotifPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+      'eos_chat', 'Чат',
+      description: 'Сообщения из чатов EOS',
+      importance: Importance.high,
+    ));
+    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+      UpdateService.notifChannelId,
+      UpdateService.notifChannelName,
+      description: 'Уведомления о новых версиях EOS',
+      importance: Importance.defaultImportance,
+    ));
+    await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
+      'eos_events',
+      'События на карте',
+      description: 'Уведомления о новых событиях на карте',
+      importance: Importance.high,
+    ));
+  } catch (_) {}
 
-  // Create notification channels
-  final androidPlugin = _localNotif
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-  await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
-    'eos_chat', 'Чат',
-    description: 'Сообщения из чатов EOS',
-    importance: Importance.high,
-  ));
-  await androidPlugin?.createNotificationChannel(const AndroidNotificationChannel(
-    UpdateService.notifChannelId,
-    UpdateService.notifChannelName,
-    description: 'Уведомления о новых версиях EOS',
-    importance: Importance.defaultImportance,
-  ));
+  // Request FCM permission
+  try {
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true, badge: true, sound: true,
+    );
+  } catch (_) {}
 
   // FCM
   FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
-  FirebaseMessaging.onMessage.listen((msg) {
+  FirebaseMessaging.onMessage.listen((msg) async {
     final title = msg.notification?.title ?? msg.data['sender'] ?? 'EOS';
     final body  = msg.notification?.body  ?? msg.data['text']   ?? '';
     if (body.isEmpty) return;
-    _localNotif.show(
+    final channel = msg.data['channel'] ?? '';
+
+    // События — всегда показываем
+    if (channel == 'eos_events') {
+      localNotifPlugin.show(
+        msg.hashCode,
+        title, body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'eos_events', 'События на карте',
+            importance: Importance.high, priority: Priority.high,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (channel.isNotEmpty && channel == currentChatChannelId) return;
+    final sp = await SharedPreferences.getInstance();
+    final muted = sp.getStringList('muted_channels') ?? [];
+    if (channel.isNotEmpty && muted.contains(channel)) return;
+    localNotifPlugin.show(
       msg.hashCode,
       title, body,
       const NotificationDetails(
@@ -103,16 +168,18 @@ Future<void> main() async {
   });
 
   // Workmanager: hourly update check
-  await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
-  await Workmanager().registerPeriodicTask(
-    UpdateService.taskName,
-    UpdateService.taskName,
-    frequency: const Duration(hours: 1),
-    constraints: Constraints(networkType: NetworkType.connected),
-    existingWorkPolicy: ExistingWorkPolicy.keep,
-    backoffPolicy: BackoffPolicy.linear,
-    backoffPolicyDelay: const Duration(minutes: 15),
-  );
+  try {
+    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    await Workmanager().registerPeriodicTask(
+      UpdateService.taskName,
+      UpdateService.taskName,
+      frequency: const Duration(hours: 1),
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+      backoffPolicy: BackoffPolicy.linear,
+      backoffPolicyDelay: const Duration(minutes: 15),
+    );
+  } catch (_) {}
 
   final prefs = PrefsService();
   await prefs.init();
@@ -126,7 +193,9 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: theme),
-        Provider.value(value: prefs),
+        ChangeNotifierProvider.value(value: prefs),
+        ChangeNotifierProvider(create: (_) => DownloadState()),
+        ChangeNotifierProvider(create: (_) => VpnProvider()),
         ProxyProvider<PrefsService, ApiService>(
           update: (_, p, _) => ApiService(p),
         ),
@@ -141,12 +210,12 @@ void _registerFcmToken(PrefsService prefs) async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null && token.isNotEmpty) {
       await prefs.setFcmToken(token);
-      final sender = prefs.profileName;
+      final sender = prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleName;
       if (sender.isNotEmpty) await ApiService(prefs).registerFcmToken(sender, token);
     }
     FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
       await prefs.setFcmToken(t);
-      final sender = prefs.profileName;
+      final sender = prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleName;
       if (sender.isNotEmpty) await ApiService(prefs).registerFcmToken(sender, t);
     });
   } catch (_) {}
@@ -160,6 +229,15 @@ class EosApp extends StatelessWidget {
     final themeNotifier = Provider.of<AppThemeNotifier>(context);
     final t = themeNotifier.current;
 
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
+    ));
+
     return MaterialApp(
       title: 'EOS',
       debugShowCheckedModeBanner: false,
@@ -172,8 +250,24 @@ class EosApp extends StatelessWidget {
         scaffoldBackgroundColor: t.bg,
         fontFamily: 'Roboto',
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarContrastEnforced: false,
+          ),
+        ),
       ),
-      home: const HomeScreen(),
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          const DownloadRingOverlay(),
+        ],
+      ),
+      home: const SplashScreen(),
     );
   }
 }
