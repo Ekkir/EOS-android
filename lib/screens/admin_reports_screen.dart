@@ -41,7 +41,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -58,7 +59,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         ],
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: t.accent))
+          ? Center(child: CircularProgressIndicator(color: notifier.accent))
           : _reports.isEmpty
               ? Center(
                   child: Column(
@@ -92,7 +93,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.person_outline, color: t.accent, size: 16),
+                                Icon(Icons.person_outline, color: notifier.accent, size: 16),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(from,

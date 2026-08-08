@@ -104,7 +104,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     final prefs = context.watch<PrefsService>();
     final q = _searchQuery.toLowerCase();
     final publicChannels = _channels
@@ -123,7 +124,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: t.surface,
-        foregroundColor: t.accent,
+        foregroundColor: notifier.accent,
         onPressed: _showNewDmDialog,
         tooltip: 'Написать сообщение',
         child: const Icon(Icons.edit),
@@ -151,7 +152,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
           Expanded(
             child: _loading
-                ? Center(child: CircularProgressIndicator(color: t.accent))
+                ? Center(child: CircularProgressIndicator(color: notifier.accent))
                 : _channels.isEmpty
                     ? Center(child: Text('Нет каналов', style: TextStyle(color: t.textSecondary)))
                     : ListView(
@@ -235,7 +236,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _showNewDmDialog() {
-    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    final dmNotifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final t = dmNotifier.current;
     final ctrl = TextEditingController();
     showDialog<void>(
       context: context,
@@ -250,7 +252,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             hintText: 'Имя пользователя',
             hintStyle: TextStyle(color: t.textSecondary),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: dmNotifier.accent)),
           ),
         ),
         actions: [
@@ -275,7 +277,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 lastTs: 0,
               ));
             },
-            child: Text('Открыть', style: TextStyle(color: t.accent)),
+            child: Text('Открыть', style: TextStyle(color: dmNotifier.accent)),
           ),
         ],
       ),
@@ -329,6 +331,7 @@ class _ChannelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.read<AppThemeNotifier>().accent;
     final name = displayNameOverride ?? channel.displayName;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -345,7 +348,7 @@ class _ChannelTile extends StatelessWidget {
                     ? CircularAvatar(name: name, bytes: dmAvatarBytes, radius: 22)
                     : CircleAvatar(
                         radius: 22,
-                        backgroundColor: theme.accent.withValues(alpha: 0.2),
+                        backgroundColor: accent.withValues(alpha: 0.2),
                         child: Text(channel.icon, style: const TextStyle(fontSize: 20)),
                       ),
                 if (hasUnread)

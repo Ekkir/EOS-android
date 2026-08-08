@@ -114,7 +114,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
                       ),
                     ),
                     if (isSelected)
-                      Icon(Icons.check_circle, color: t.accent),
+                      Icon(Icons.check_circle, color: notifier.accent),
                   ],
                 ),
               ),
@@ -131,21 +131,21 @@ class _ThemesScreenState extends State<ThemesScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.lightbulb_outline, color: t.accent, size: 18),
+                      Icon(Icons.lightbulb_outline, color: notifier.accent, size: 18),
                       const SizedBox(width: 8),
                       Text('Интенсивность свечения',
                         style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
                       const Spacer(),
                       Text('${(notifier.glowIntensity * 100).toInt()}%',
-                        style: TextStyle(color: t.accent, fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: TextStyle(color: notifier.accent, fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   SliderTheme(
                     data: SliderThemeData(
-                      activeTrackColor: t.accent,
+                      activeTrackColor: notifier.accent,
                       inactiveTrackColor: t.cardBorder,
-                      thumbColor: t.accent,
-                      overlayColor: t.accent.withValues(alpha: 0.2),
+                      thumbColor: notifier.accent,
+                      overlayColor: notifier.accent.withValues(alpha: 0.2),
                       trackHeight: 3,
                     ),
                     child: Slider(
@@ -230,7 +230,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
                           errorText: _hexError,
                           errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
                           enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
                         ),
                         onSubmitted: (_) => _applyHex(notifier),
                       ),
@@ -238,7 +238,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
                     const SizedBox(width: 10),
                     TextButton(
                       onPressed: () => _applyHex(notifier),
-                      style: TextButton.styleFrom(foregroundColor: t.accent),
+                      style: TextButton.styleFrom(foregroundColor: notifier.accent),
                       child: const Text('Применить'),
                     ),
                   ],

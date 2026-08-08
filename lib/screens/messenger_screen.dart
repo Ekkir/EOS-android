@@ -379,7 +379,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
   // ── Медиа ─────────────────────────────────────────────────────────────────────
 
   void _pickMedia() {
-    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    final mediaNotifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final t = mediaNotifier.current;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: t.surface,
@@ -398,12 +399,12 @@ class _MessengerScreenState extends State<MessengerScreen> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.image_outlined, color: t.accent),
+              leading: Icon(Icons.image_outlined, color: mediaNotifier.accent),
               title: Text('Изображение', style: TextStyle(color: t.textPrimary)),
               onTap: () { Navigator.pop(ctx); _sendImage(); },
             ),
             ListTile(
-              leading: Icon(Icons.attach_file, color: t.accent),
+              leading: Icon(Icons.attach_file, color: mediaNotifier.accent),
               title: Text('Файл', style: TextStyle(color: t.textPrimary)),
               onTap: () { Navigator.pop(ctx); _sendFile(); },
             ),
@@ -553,13 +554,14 @@ class _MessengerScreenState extends State<MessengerScreen> {
   }
 
   void _showMessageMenu(Message msg, bool isMe, Offset globalPos) {
-    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    final menuNotifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final t = menuNotifier.current;
     final size = MediaQuery.of(context).size;
     final items = <PopupMenuEntry<String>>[
       PopupMenuItem<String>(
         value: 'reply',
         child: Row(children: [
-          Icon(Icons.reply, color: t.accent, size: 20),
+          Icon(Icons.reply, color: menuNotifier.accent, size: 20),
           const SizedBox(width: 12),
           Text('Ответить', style: TextStyle(color: t.textPrimary)),
         ]),
@@ -568,7 +570,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
         PopupMenuItem<String>(
           value: 'copy',
           child: Row(children: [
-            Icon(Icons.copy, color: t.accent, size: 20),
+            Icon(Icons.copy, color: menuNotifier.accent, size: 20),
             const SizedBox(width: 12),
             Text('Копировать', style: TextStyle(color: t.textPrimary)),
           ]),
@@ -577,7 +579,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
         PopupMenuItem<String>(
           value: 'edit',
           child: Row(children: [
-            Icon(Icons.edit_outlined, color: t.accent, size: 20),
+            Icon(Icons.edit_outlined, color: menuNotifier.accent, size: 20),
             const SizedBox(width: 12),
             Text('Редактировать', style: TextStyle(color: t.textPrimary)),
           ]),
@@ -630,7 +632,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     final prefs = context.watch<PrefsService>();
     final myName = _resolveSenderName(prefs);
     final isMuted = prefs.isChannelMuted(widget.channel.id);
@@ -653,8 +656,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
                       radius: 18)
                   : CircleAvatar(
                       radius: 18,
-                      backgroundColor: t.accent.withValues(alpha: 0.2),
-                      child: Icon(Icons.group, color: t.accent, size: 18),
+                      backgroundColor: notifier.accent.withValues(alpha: 0.2),
+                      child: Icon(Icons.group, color: notifier.accent, size: 18),
                     ),
               const SizedBox(width: 10),
               Text(
@@ -670,7 +673,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
         actions: [
           IconButton(
             icon: Icon(isMuted ? Icons.notifications_off_outlined : Icons.notifications_outlined,
-                color: isMuted ? t.textSecondary : t.accent),
+                color: isMuted ? t.textSecondary : notifier.accent),
             tooltip: isMuted ? 'Включить уведомления' : 'Выключить уведомления',
             onPressed: () {
               if (isMuted) {

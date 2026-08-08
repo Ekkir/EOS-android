@@ -63,7 +63,8 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
@@ -106,7 +107,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 child: ElevatedButton(
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: t.accent,
+                    backgroundColor: notifier.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -122,14 +123,14 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 child: OutlinedButton(
                   onPressed: _testing ? null : _test,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: t.accent,
-                    side: BorderSide(color: t.accent),
+                    foregroundColor: notifier.accent,
+                    side: BorderSide(color: notifier.accent),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _testing
                       ? SizedBox(height: 20, width: 20,
-                          child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
+                          child: CircularProgressIndicator(color: notifier.accent, strokeWidth: 2))
                       : const Text('Проверить', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -171,7 +172,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       borderRadius: BorderRadius.circular(10),
     ),
     focusedBorder: OutlineInputBorder(
-      borderSide: BorderSide(color: t.accent),
+      borderSide: BorderSide(color: Provider.of<AppThemeNotifier>(context, listen: false).accent),
       borderRadius: BorderRadius.circular(10),
     ),
     filled: true,

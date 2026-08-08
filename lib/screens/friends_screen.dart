@@ -53,7 +53,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -63,7 +64,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: t.accent))
+          ? Center(child: CircularProgressIndicator(color: notifier.accent))
           : _friends.isEmpty
               ? Center(
                   child: Text('Список друзей пуст',
@@ -112,7 +113,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           ),
                         ),
                         trailing: IconButton(
-                          icon: Icon(Icons.message_outlined, color: t.accent),
+                          icon: Icon(Icons.message_outlined, color: notifier.accent),
                           tooltip: 'Написать',
                           onPressed: () => _openDm(name),
                         ),

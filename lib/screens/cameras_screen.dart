@@ -42,6 +42,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
   }
 
   void _showAddDialog(ThemeDef t) {
+    final accent = Provider.of<AppThemeNotifier>(context, listen: false).accent;
     final nameCtrl = TextEditingController();
     final urlCtrl = TextEditingController();
     showDialog(
@@ -62,7 +63,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: t.cardBorder)),
                 focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: t.accent)),
+                  borderSide: BorderSide(color: accent)),
               ),
             ),
             const SizedBox(height: 12),
@@ -75,7 +76,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: t.cardBorder)),
                 focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: t.accent)),
+                  borderSide: BorderSide(color: accent)),
               ),
               keyboardType: TextInputType.url,
             ),
@@ -95,7 +96,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
               _save();
               Navigator.pop(ctx);
             },
-            child: Text('Добавить', style: TextStyle(color: t.accent)),
+            child: Text('Добавить', style: TextStyle(color: accent)),
           ),
         ],
       ),
@@ -109,7 +110,8 @@ class _CamerasScreenState extends State<CamerasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
@@ -118,7 +120,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: t.accent),
+            icon: Icon(Icons.add, color: notifier.accent),
             onPressed: () => _showAddDialog(t),
             tooltip: 'Добавить камеру',
           ),
@@ -153,11 +155,11 @@ class _CamerasScreenState extends State<CamerasScreen> {
                       Container(
                         width: 44, height: 44,
                         decoration: BoxDecoration(
-                          color: t.accent.withValues(alpha: 0.15),
+                          color: notifier.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
-                        child: Icon(Icons.videocam_outlined, color: t.accent, size: 22),
+                        child: Icon(Icons.videocam_outlined, color: notifier.accent, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -179,7 +181,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.play_circle_outline, color: t.accent),
+                        icon: Icon(Icons.play_circle_outline, color: notifier.accent),
                         tooltip: 'Смотреть',
                         onPressed: () => Navigator.push(
                           context,
@@ -235,7 +237,7 @@ class _CameraViewerScreenState extends State<_CameraViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier2 = Provider.of<AppThemeNotifier>(context);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -258,7 +260,7 @@ class _CameraViewerScreenState extends State<_CameraViewerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: t.accent),
+                  CircularProgressIndicator(color: notifier2.accent),
                   const SizedBox(height: 16),
                   const Text('Подключение...', style: TextStyle(color: Colors.white70)),
                 ],

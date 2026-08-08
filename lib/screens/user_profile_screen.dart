@@ -127,7 +127,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     final prefs = context.read<PrefsService>();
     final displayName = _profile?['display_name'] as String? ?? widget.username;
     final bio = _profile?['bio'] as String? ?? '';
@@ -142,7 +143,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: t.accent))
+          ? Center(child: CircularProgressIndicator(color: notifier.accent))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -201,7 +202,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isFriend
                                   ? t.surface
-                                  : t.accent,
+                                  : notifier.accent,
                               foregroundColor: _isFriend ? t.textSecondary : Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -220,7 +221,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             icon: const Icon(Icons.message),
                             label: const Text('Написать'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: t.accent,
+                              backgroundColor: notifier.accent,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -239,7 +240,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         icon: const Icon(Icons.message),
                         label: const Text('Написать'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: t.accent,
+                          backgroundColor: notifier.accent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

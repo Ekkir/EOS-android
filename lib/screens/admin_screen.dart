@@ -71,7 +71,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
@@ -80,19 +81,19 @@ class _AdminScreenState extends State<AdminScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: t.accent),
+            icon: Icon(Icons.refresh, color: notifier.accent),
             onPressed: _fetch,
           ),
           IconButton(
             icon: _restarting
-                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
+                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: notifier.accent, strokeWidth: 2))
                 : const Icon(Icons.power_settings_new, color: Colors.red),
             onPressed: _restarting ? null : _restart,
           ),
         ],
       ),
       body: GlassBg(child: _loading
-          ? Center(child: CircularProgressIndicator(color: t.accent))
+          ? Center(child: CircularProgressIndicator(color: notifier.accent))
           : ListView(
               padding: const EdgeInsets.all(12),
               children: [
@@ -167,6 +168,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.read<AppThemeNotifier>().accent;
     final items = stats.entries.toList();
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -180,14 +182,14 @@ class _StatCard extends StatelessWidget {
             children: items.map((e) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: theme.accent.withValues(alpha: 0.1),
+                color: accent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: theme.cardBorder),
               ),
               child: Column(
                 children: [
                   Text('${e.value}',
-                    style: TextStyle(color: theme.accent, fontSize: 20, fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: accent, fontSize: 20, fontWeight: FontWeight.bold)),
                   Text(_labels[e.key] ?? e.key,
                     style: TextStyle(color: theme.textSecondary, fontSize: 11)),
                 ],

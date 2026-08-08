@@ -87,7 +87,8 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
@@ -96,7 +97,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: GlassBg(child: _loading
-          ? Center(child: CircularProgressIndicator(color: t.accent))
+          ? Center(child: CircularProgressIndicator(color: notifier.accent))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -110,7 +111,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   child: ElevatedButton(
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: t.accent,
+                      backgroundColor: notifier.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -143,6 +144,7 @@ class _RoadSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.read<AppThemeNotifier>().accent;
     final roadFields = fields.where((f) => f.$1.startsWith(road)).toList();
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -158,7 +160,7 @@ class _RoadSection extends StatelessWidget {
                 onPressed: () => onReset(road),
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('Сброс'),
-                style: TextButton.styleFrom(foregroundColor: theme.accent),
+                style: TextButton.styleFrom(foregroundColor: accent),
               ),
             ],
           ),
@@ -185,7 +187,7 @@ class _RoadSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: theme.accent),
+                        borderSide: BorderSide(color: accent),
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),

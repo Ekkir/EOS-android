@@ -58,7 +58,8 @@ class _TrafficScreenState extends State<TrafficScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
@@ -71,7 +72,7 @@ class _TrafficScreenState extends State<TrafficScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 width: 20, height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: t.accent),
+                child: CircularProgressIndicator(strokeWidth: 2, color: notifier.accent),
               ),
             ),
           IconButton(
@@ -97,7 +98,7 @@ class _TrafficScreenState extends State<TrafficScreen> {
             child: _snapshot == null
                 ? Center(
                     child: _loading
-                        ? CircularProgressIndicator(color: t.accent)
+                        ? CircularProgressIndicator(color: notifier.accent)
                         : Text('Нет данных', style: TextStyle(color: t.textSecondary)),
                   )
                 : RoadMapWidget(

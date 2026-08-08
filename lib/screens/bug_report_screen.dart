@@ -81,7 +81,8 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -111,7 +112,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
                       hintText: 'Ваше имя',
                       hintStyle: TextStyle(color: t.textSecondary),
                       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -124,7 +125,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
                       hintText: 'Модель устройства',
                       hintStyle: TextStyle(color: t.textSecondary),
                       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -143,7 +144,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: t.accent),
+                        borderSide: BorderSide(color: notifier.accent),
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
@@ -162,7 +163,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
                     : const Icon(Icons.send),
                 label: const Text('Отправить', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: t.accent,
+                  backgroundColor: notifier.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

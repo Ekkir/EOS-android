@@ -262,7 +262,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     final prefs = context.read<PrefsService>();
     final myEmail = prefs.googleEmail;
 
@@ -279,7 +280,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         iconTheme: IconThemeData(color: t.textPrimary),
         actions: [
           IconButton(
-            icon: Icon(Icons.my_location, color: t.accent),
+            icon: Icon(Icons.my_location, color: notifier.accent),
             onPressed: _myLocation != null
                 ? () => _mapController.move(_myLocation!, 15)
                 : null,
@@ -321,11 +322,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     width: 20, height: 20,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: _sharingLocation ? Colors.green : t.accent,
+                        color: _sharingLocation ? Colors.green : notifier.accent,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [BoxShadow(
-                          color: (_sharingLocation ? Colors.green : t.accent).withValues(alpha: 0.4),
+                          color: (_sharingLocation ? Colors.green : notifier.accent).withValues(alpha: 0.4),
                           blurRadius: 8,
                         )],
                       ),
@@ -483,6 +484,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   List<Marker> _buildLocationMarkers(String myEmail, ThemeDef t) {
+    final accent = context.read<AppThemeNotifier>().accent;
     return _liveLocations
         .where((loc) => (loc['email'] as String? ?? '') != myEmail)
         .map((loc) {
@@ -502,7 +504,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: t.accent,
+                color: accent,
                 border: Border.all(color: Colors.white, width: 2),
               ),
               child: avatarBytes != null
@@ -519,7 +521,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: t.accent.withValues(alpha: 0.85),
+                color: accent.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -718,7 +720,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   void _showCreateEventDialog(LatLng latLng, PrefsService prefs) {
-    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    final evtNotifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final t = evtNotifier.current;
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     String selectedType = 'meetup';
@@ -788,13 +791,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         label: Text(lbl),
                         selected: selectedDuration == dur,
                         onSelected: (_) => setLocal(() => selectedDuration = dur),
-                        selectedColor: t.accent.withValues(alpha: 0.2),
+                        selectedColor: evtNotifier.accent.withValues(alpha: 0.2),
                         labelStyle: TextStyle(
-                          color: selectedDuration == dur ? t.accent : t.textSecondary,
+                          color: selectedDuration == dur ? evtNotifier.accent : t.textSecondary,
                         ),
                         backgroundColor: t.surface,
                         side: BorderSide(
-                          color: selectedDuration == dur ? t.accent : t.cardBorder,
+                          color: selectedDuration == dur ? evtNotifier.accent : t.cardBorder,
                         ),
                       ),
                   ],
@@ -808,7 +811,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     labelText: 'Название',
                     labelStyle: TextStyle(color: t.textSecondary),
                     enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: evtNotifier.accent)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -821,7 +824,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     labelText: 'Описание (необязательно)',
                     labelStyle: TextStyle(color: t.textSecondary),
                     enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: evtNotifier.accent)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -850,7 +853,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       _fetchEvents();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: t.accent,
+                      backgroundColor: evtNotifier.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -895,7 +898,8 @@ class _RadialFabState extends State<_RadialFab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final fabNotifier = Provider.of<AppThemeNotifier>(context);
+    final t = fabNotifier.current;
     return SizedBox(
       width: 48,
       height: 180,
@@ -941,7 +945,7 @@ class _RadialFabState extends State<_RadialFab> {
                 duration: _duration,
                 child: _SubFab(
                   icon: Icons.add_location_alt_outlined,
-                  color: t.accent,
+                  color: fabNotifier.accent,
                   label: 'Добавить событие',
                   tooltip: 'Добавить событие',
                   onPressed: () {

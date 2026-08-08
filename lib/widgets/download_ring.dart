@@ -71,7 +71,7 @@ class DownloadRingOverlay extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.download, color: t.accent, size: 16),
+                            Icon(Icons.download, color: notifier.accent, size: 16),
                             const SizedBox(width: 6),
                             Text(
                               'Загрузка обновления',
@@ -89,7 +89,7 @@ class DownloadRingOverlay extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: dl.progress,
                             backgroundColor: t.cardBorder,
-                            valueColor: AlwaysStoppedAnimation<Color>(t.accent),
+                            valueColor: AlwaysStoppedAnimation<Color>(notifier.accent),
                             minHeight: 5,
                           ),
                         ),
@@ -100,7 +100,7 @@ class DownloadRingOverlay extends StatelessWidget {
                             Text(
                               '${(dl.progress * 100).toStringAsFixed(1)}%',
                               style: TextStyle(
-                                color: t.accent,
+                                color: notifier.accent,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),

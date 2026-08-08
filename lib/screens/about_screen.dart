@@ -129,7 +129,8 @@ class _AboutScreenState extends State<AboutScreen>
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -151,7 +152,7 @@ class _AboutScreenState extends State<AboutScreen>
               frequency: 0.7,
               child: Text('EOS',
                 style: TextStyle(
-                  color: t.accent,
+                  color: notifier.accent,
                   fontSize: 64,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 8,
@@ -165,7 +166,7 @@ class _AboutScreenState extends State<AboutScreen>
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: t.accent),
+                  Icon(Icons.info_outline, color: notifier.accent),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,18 +183,18 @@ class _AboutScreenState extends State<AboutScreen>
                     builder: (_, _) => OutlinedButton(
                       onPressed: (_checking || _downloading) ? null : _checkUpdate,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: t.accent,
-                        side: BorderSide(color: t.accent),
+                        foregroundColor: notifier.accent,
+                        side: BorderSide(color: notifier.accent),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       child: _checking
                           ? SizedBox(width: 16, height: 16,
-                              child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
+                              child: CircularProgressIndicator(color: notifier.accent, strokeWidth: 2))
                           : ShaderMask(
                               shaderCallback: (bounds) => LinearGradient(
                                 begin: Alignment(_shimmerAnim.value - 1, 0),
                                 end: Alignment(_shimmerAnim.value + 1, 0),
-                                colors: [t.accent, Colors.white, t.accent],
+                                colors: [notifier.accent, Colors.white, notifier.accent],
                               ).createShader(bounds),
                               blendMode: BlendMode.srcIn,
                               child: const Text('Проверить'),
@@ -305,7 +306,7 @@ class _AboutScreenState extends State<AboutScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Icon(Icons.code, color: t.accent, size: 22),
+                  Icon(Icons.code, color: notifier.accent, size: 22),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -335,7 +336,7 @@ class _AboutScreenState extends State<AboutScreen>
                       ? CircleAvatar(
                           radius: 28,
                           backgroundColor: t.surface,
-                          child: CircularProgressIndicator(color: t.accent, strokeWidth: 2),
+                          child: CircularProgressIndicator(color: notifier.accent, strokeWidth: 2),
                         )
                       : CircularAvatar(bytes: _creatorAvatar, name: 'Ekkir', radius: 28),
                   const SizedBox(width: 16),
@@ -372,9 +373,10 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.read<AppThemeNotifier>().accent;
     return Row(
       children: [
-        Icon(icon, color: t.accent, size: 18),
+        Icon(icon, color: accent, size: 18),
         const SizedBox(width: 10),
         Text(label, style: TextStyle(color: t.textSecondary, fontSize: 14)),
         const Spacer(),

@@ -204,7 +204,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Provider.of<AppThemeNotifier>(context).current;
+    final notifier = Provider.of<AppThemeNotifier>(context);
+    final t = notifier.current;
     final prefs = context.read<PrefsService>();
 
     return Scaffold(
@@ -227,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _loadingAvatar
                       ? CircleAvatar(radius: 52, backgroundColor: t.surface,
-                          child: CircularProgressIndicator(color: t.accent, strokeWidth: 2))
+                          child: CircularProgressIndicator(color: notifier.accent, strokeWidth: 2))
                       : CircularAvatar(
                           bytes: _avatarBytes,
                           name: prefs.profileName.isNotEmpty ? prefs.profileName
@@ -236,7 +237,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                   Container(
                     padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: notifier.accent, shape: BoxShape.circle),
                     child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
                   ),
                 ],
@@ -259,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       hintText: 'Ваше имя',
                       hintStyle: TextStyle(color: t.textSecondary),
                       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -273,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       hintText: 'Расскажите о себе...',
                       hintStyle: TextStyle(color: t.textSecondary),
                       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.accent)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -290,7 +291,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ElevatedButton(
                 onPressed: _saving ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: t.accent,
+                  backgroundColor: notifier.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -337,19 +338,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
                                 color: prefs.adminEffect == e.$1
-                                    ? t.accent.withValues(alpha: 0.2)
+                                    ? notifier.accent.withValues(alpha: 0.2)
                                     : t.surface,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: prefs.adminEffect == e.$1
-                                      ? t.accent
+                                      ? notifier.accent
                                       : t.cardBorder,
                                 ),
                               ),
                               child: Text(e.$2,
                                 style: TextStyle(
                                   color: prefs.adminEffect == e.$1
-                                      ? t.accent
+                                      ? notifier.accent
                                       : t.textSecondary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
@@ -494,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
-                    Icon(Icons.bug_report_outlined, color: t.accent),
+                    Icon(Icons.bug_report_outlined, color: notifier.accent),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -522,7 +523,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
-                    Icon(Icons.people_outline, color: t.accent),
+                    Icon(Icons.people_outline, color: notifier.accent),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text('Друзья',
@@ -542,7 +543,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (prefs.googlePhoto.isNotEmpty)
                           ClipOval(child: Image.network(prefs.googlePhoto, width: 40, height: 40, fit: BoxFit.cover))
                         else
-                          CircleAvatar(radius: 20, backgroundColor: t.accent,
+                          CircleAvatar(radius: 20, backgroundColor: notifier.accent,
                               child: Text(prefs.googleName.isNotEmpty ? prefs.googleName[0].toUpperCase() : 'G',
                                   style: const TextStyle(color: Colors.white))),
                         const SizedBox(width: 12),
@@ -557,7 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         TextButton(
                           onPressed: _signOut,
-                          child: Text('Выйти', style: TextStyle(color: t.accent)),
+                          child: Text('Выйти', style: TextStyle(color: notifier.accent)),
                         ),
                       ],
                     )
@@ -633,6 +634,7 @@ class _AnimSliderState extends State<_AnimSlider> {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.read<AppThemeNotifier>().accent;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -641,15 +643,15 @@ class _AnimSliderState extends State<_AnimSlider> {
           children: [
             Text(widget.label, style: TextStyle(color: widget.theme.textSecondary, fontSize: 13)),
             Text(_val.toStringAsFixed(1),
-                style: TextStyle(color: widget.theme.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+                style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: widget.theme.accent,
+            activeTrackColor: accent,
             inactiveTrackColor: widget.theme.cardBorder,
-            thumbColor: widget.theme.accent,
-            overlayColor: widget.theme.accent.withValues(alpha: 0.2),
+            thumbColor: accent,
+            overlayColor: accent.withValues(alpha: 0.2),
           ),
           child: Slider(
             value: _val,
