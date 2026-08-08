@@ -66,6 +66,22 @@ class GlassCard extends StatelessWidget {
           );
         }),
       );
+    } else if (t.cyberpunk) {
+      final a  = notifier.accent;
+      final a2 = notifier.accent2;
+      content = Container(
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: a.withValues(alpha: 0.55), width: 1),
+          boxShadow: [
+            BoxShadow(color: a.withValues(alpha: 0.18), blurRadius: 12),
+            BoxShadow(color: a2.withValues(alpha: 0.10), blurRadius: 22),
+          ],
+        ),
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
+      );
     } else {
       content = Container(
         decoration: BoxDecoration(

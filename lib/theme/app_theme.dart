@@ -15,6 +15,7 @@ class ThemeDef {
   final bool glassy;
   final bool isLiquidGlass;
   final bool neonGlow;
+  final bool cyberpunk;
 
   const ThemeDef({
     required this.id,
@@ -30,6 +31,7 @@ class ThemeDef {
     this.glassy = false,
     this.isLiquidGlass = false,
     this.neonGlow = false,
+    this.cyberpunk = false,
   }) : accent2 = accent2 ?? accent;
 }
 
@@ -73,6 +75,19 @@ class AppThemeNotifier extends ChangeNotifier {
       textPrimary: Colors.white,
       textSecondary: const Color(0x99FFFFFF),
       cardBorder: const Color(0x22FFFFFF),
+    ),
+    ThemeDef(
+      id: 'cyberpunk',
+      name: 'Cyberpunk',
+      bg: const Color(0xFF050010),
+      surface: const Color(0xFF0D0022),
+      nav: const Color(0xFF080018),
+      accent: const Color(0xFFFF0090),
+      accent2: const Color(0xFF00F0FF),
+      textPrimary: Colors.white,
+      textSecondary: const Color(0xFF9966BB),
+      cardBorder: const Color(0x66FF0090),
+      cyberpunk: true,
     ),
   ];
 

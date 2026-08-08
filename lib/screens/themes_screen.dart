@@ -107,6 +107,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
                               ? 'iOS 26 Liquid Glass'
                               : theme.neonGlow ? 'Неоновое свечение'
                               : theme.glassy ? 'Glassmorphism'
+                              : theme.cyberpunk ? 'Глитч и неоновое свечение'
                               : 'Чистый стиль',
                             style: TextStyle(color: t.textSecondary, fontSize: 13)),
                         ],

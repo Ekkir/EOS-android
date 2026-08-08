@@ -3,6 +3,35 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 
+class CyberpunkScanlines extends StatelessWidget {
+  const CyberpunkScanlines({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _ScanlinesPainter(),
+        size: Size.infinite,
+      ),
+    );
+  }
+}
+
+class _ScanlinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x1A000000)
+      ..style = PaintingStyle.fill;
+    for (double y = 0; y < size.height; y += 4) {
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1.5), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class GlassSurface extends StatelessWidget {
   final Widget child;
   final BorderRadius borderRadius;

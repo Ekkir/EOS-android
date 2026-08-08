@@ -6,7 +6,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
-  static const currentVersion = '1.1.89';
+  static const currentVersion = '1.1.90';
   static const _installerChannel = MethodChannel('com.traffic.app/installer');
   static const taskName = 'eos_update_check';
   static const notifChannelId = 'eos_updates';

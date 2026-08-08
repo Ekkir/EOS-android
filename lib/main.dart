@@ -14,6 +14,7 @@ import 'services/api_service.dart';
 import 'services/update_service.dart';
 import 'providers/vpn_provider.dart';
 import 'widgets/download_ring.dart';
+import 'widgets/glass_surface.dart';
 import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 
@@ -261,12 +262,17 @@ class EosApp extends StatelessWidget {
           ),
         ),
       ),
-      builder: (context, child) => Stack(
-        children: [
-          child!,
-          const DownloadRingOverlay(),
-        ],
-      ),
+      builder: (context, child) {
+        final notifier = Provider.of<AppThemeNotifier>(context);
+        return Stack(
+          children: [
+            child!,
+            if (notifier.current.cyberpunk)
+              const Positioned.fill(child: CyberpunkScanlines()),
+            const DownloadRingOverlay(),
+          ],
+        );
+      },
       home: const SplashScreen(),
     );
   }

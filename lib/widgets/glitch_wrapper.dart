@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 
 class GlitchWrapper extends StatefulWidget {
   final Widget child;
-  final double intensity; // 0.0–1.0, default 0.5
-  final double speed;     // animation frame speed multiplier, default 1.0
-  final double frequency; // how often glitch fires, 0.3–3.0, default 1.0
+  final double intensity;  // 0.0–1.0
+  final double speed;
+  final double frequency;
+  final bool chromatic;    // RGB chromatic aberration on glitch
 
   const GlitchWrapper({
     super.key,
@@ -13,6 +14,7 @@ class GlitchWrapper extends StatefulWidget {
     this.intensity = 0.5,
     this.speed = 1.0,
     this.frequency = 1.0,
+    this.chromatic = false,
   });
 
   @override
@@ -59,6 +61,45 @@ class _GlitchWrapperState extends State<GlitchWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.chromatic && _colorShift) {
+      final shift = 3.5 * widget.intensity;
+      return Transform.translate(
+        offset: _offset,
+        child: Stack(
+          children: [
+            // Cyan (G+B) shifted left
+            Transform.translate(
+              offset: Offset(-shift, 0),
+              child: ColorFiltered(
+                colorFilter: const ColorFilter.matrix([
+                  0, 0, 0, 0, 0,
+                  0, 1, 0, 0, 0,
+                  0, 0, 1, 0, 0,
+                  0, 0, 0, 0.65, 0,
+                ]),
+                child: widget.child,
+              ),
+            ),
+            // Red shifted right
+            Transform.translate(
+              offset: Offset(shift, 0),
+              child: ColorFiltered(
+                colorFilter: const ColorFilter.matrix([
+                  1, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0,
+                  0, 0, 0, 0.65, 0,
+                ]),
+                child: widget.child,
+              ),
+            ),
+            // Normal center
+            widget.child,
+          ],
+        ),
+      );
+    }
+
     Widget child = widget.child;
     if (_colorShift) {
       child = ColorFiltered(

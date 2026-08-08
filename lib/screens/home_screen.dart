@@ -11,6 +11,7 @@ import '../services/update_service.dart';
 import '../widgets/admin_avatar_widget.dart';
 import '../widgets/drawer_widget.dart';
 import '../widgets/glass_surface.dart';
+import '../widgets/glitch_wrapper.dart';
 import '../widgets/gradient_progress_bar.dart';
 import 'traffic_screen.dart';
 import 'map_screen.dart';
@@ -278,10 +279,12 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            if (t.isLiquidGlass)
+            if (t.isLiquidGlass || t.cyberpunk)
               Positioned.fill(child: AmbientGlow(accent: a)),
             if (t.isLiquidGlass || t.glassy)
               Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.15))),
+            if (t.cyberpunk)
+              const Positioned.fill(child: CyberpunkScanlines()),
             Column(
               children: [
                 Builder(builder: (ctx) => _buildHeader(ctx, t, a, displayName)),
@@ -318,14 +321,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: Column(
-              children: [
-                Text('EOS', style: TextStyle(color: t.textPrimary,
-                    fontSize: 22, fontWeight: FontWeight.bold)),
-                Text('SYSTEM', style: TextStyle(color: a, fontSize: 9,
-                    letterSpacing: 3, fontWeight: FontWeight.bold)),
-              ],
-            ),
+            child: Builder(builder: (ctx) {
+              Widget title = Column(
+                children: [
+                  Text('EOS', style: TextStyle(color: t.textPrimary,
+                      fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text('SYSTEM', style: TextStyle(color: a, fontSize: 9,
+                      letterSpacing: 3, fontWeight: FontWeight.bold)),
+                ],
+              );
+              if (t.cyberpunk) {
+                title = GlitchWrapper(
+                  intensity: 0.9,
+                  frequency: 0.7,
+                  chromatic: true,
+                  child: title,
+                );
+              }
+              return title;
+            }),
           ),
           const SizedBox(width: 44),
         ],
@@ -334,6 +348,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCard(BuildContext context, _Section s, ThemeDef t, Color a) {
+    final notifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final a2 = notifier.accent2;
+
+    Widget iconBox = Container(
+      width: 44, height: 44,
+      decoration: BoxDecoration(
+        color: a.withValues(alpha: t.cyberpunk ? 0.12 : 0.15),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: t.cyberpunk
+            ? [BoxShadow(color: a.withValues(alpha: 0.35), blurRadius: 10)]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: Icon(s.icon, color: a, size: 22),
+    );
+
+    if (t.cyberpunk) {
+      iconBox = GlitchWrapper(
+        intensity: 0.5,
+        frequency: 0.5,
+        chromatic: true,
+        child: iconBox,
+      );
+    }
+
     final rowContent = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -341,15 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color: a.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(s.icon, color: a, size: 22),
-              ),
+              iconBox,
               if (s.badge > 0)
                 Positioned(
                   top: -4, right: -6,
@@ -401,6 +432,20 @@ class _HomeScreenState extends State<HomeScreen> {
             child: rowContent,
           ),
         ),
+      );
+    } else if (t.cyberpunk) {
+      card = Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: a.withValues(alpha: 0.5), width: 1),
+          boxShadow: [
+            BoxShadow(color: a.withValues(alpha: 0.20), blurRadius: 14, spreadRadius: 0),
+            BoxShadow(color: a2.withValues(alpha: 0.12), blurRadius: 24, spreadRadius: 0),
+          ],
+        ),
+        child: rowContent,
       );
     } else {
       card = Container(
