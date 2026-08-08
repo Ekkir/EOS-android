@@ -141,6 +141,32 @@ class _SettingTile extends StatelessWidget {
           ),
         ),
       );
+    } else if (t.neonGlow) {
+      final nA2 = context.read<AppThemeNotifier>().accent2;
+      card = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: nA2.withValues(alpha: 0.55), width: 1),
+        ),
+        child: content,
+      );
+    } else if (t.cyberpunk) {
+      final cpN = context.read<AppThemeNotifier>();
+      card = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cpN.accent.withValues(alpha: 0.5), width: 1),
+          boxShadow: [
+            BoxShadow(color: cpN.accent.withValues(alpha: 0.20), blurRadius: 14),
+            BoxShadow(color: cpN.accent2.withValues(alpha: 0.12), blurRadius: 24),
+          ],
+        ),
+        child: content,
+      );
     } else {
       card = Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

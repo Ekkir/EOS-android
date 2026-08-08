@@ -78,12 +78,31 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     final f = _friends[i];
                     final name = f['display_name'] as String? ?? f['email'] as String? ?? '?';
                     final isOnline = f['is_online'] as bool? ?? false;
-                    return Container(
-                      decoration: BoxDecoration(
+                    final BoxDecoration friendDecor;
+                    if (t.neonGlow) {
+                      friendDecor = BoxDecoration(
+                        color: t.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: notifier.accent2.withValues(alpha: 0.55), width: 1),
+                      );
+                    } else if (t.cyberpunk) {
+                      friendDecor = BoxDecoration(
+                        color: t.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: notifier.accent.withValues(alpha: 0.5), width: 1),
+                        boxShadow: [
+                          BoxShadow(color: notifier.accent.withValues(alpha: 0.18), blurRadius: 10),
+                        ],
+                      );
+                    } else {
+                      friendDecor = BoxDecoration(
                         color: t.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: t.cardBorder),
-                      ),
+                      );
+                    }
+                    return Container(
+                      decoration: friendDecor,
                       child: ListTile(
                         leading: Stack(
                           clipBehavior: Clip.none,

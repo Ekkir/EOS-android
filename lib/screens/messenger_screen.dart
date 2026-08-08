@@ -185,11 +185,16 @@ class _MessengerScreenState extends State<MessengerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preloadedIds.addAll(newMsgs.map((m) => m.id));
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        final pos = _scrollCtrl.position;
+        final isNearBottom = pos.maxScrollExtent - pos.pixels < 120;
+        final hasSelfMsg = newMsgs.any((m) => m.sender == _myName);
+        if (isNearBottom || hasSelfMsg) {
+          _scrollCtrl.animateTo(
+            pos.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
       }
     });
   }

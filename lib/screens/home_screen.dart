@@ -447,6 +447,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: rowContent,
       );
+    } else if (t.neonGlow) {
+      card = Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: a2.withValues(alpha: 0.55), width: 1),
+        ),
+        child: rowContent,
+      );
     } else {
       card = Container(
         height: 72,

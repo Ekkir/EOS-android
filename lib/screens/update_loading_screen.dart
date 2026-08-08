@@ -46,7 +46,7 @@ class _UpdateLoadingScreenState extends State<UpdateLoadingScreen>
 
   Future<void> _startInstall() async {
     final ok = await UpdateService.installApk(widget.apkPath);
-    if (!ok && mounted) {
+    if (ok != null && mounted) {
       await OpenFile.open(widget.apkPath,
           type: 'application/vnd.android.package-archive');
     }
