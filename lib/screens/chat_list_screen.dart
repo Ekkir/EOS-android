@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_theme.dart' show AppThemeNotifier, ThemeDef, NeonTextStyle;
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../models/channel.dart';
@@ -331,7 +331,9 @@ class _ChannelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = context.read<AppThemeNotifier>().accent;
+    final notifier = context.read<AppThemeNotifier>();
+    final accent = notifier.accent;
+    final neon = theme.neonGlow;
     final name = displayNameOverride ?? channel.displayName;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -370,11 +372,14 @@ class _ChannelTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name,
-                    style: TextStyle(
-                      color: theme.textPrimary,
-                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
-                      fontSize: 15,
-                    ),
+                    style: (() {
+                      final base = TextStyle(
+                        color: theme.textPrimary,
+                        fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                        fontSize: 15,
+                      );
+                      return neon ? base.withNeonGlow(accent) : base;
+                    })(),
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (channel.lastText.isNotEmpty)

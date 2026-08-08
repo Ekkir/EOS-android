@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_theme.dart' show AppThemeNotifier, ThemeDef, NeonTextStyle;
 import '../services/prefs_service.dart';
 import 'admin_avatar_widget.dart';
 import '../services/api_service.dart';
@@ -77,7 +77,9 @@ class _DrawerWidgetState extends State<DrawerWidget> {
                 ),
               ),
               title: Text(displayName,
-                  style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
+                  style: t.neonGlow
+                      ? TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold).withNeonGlow(a)
+                      : TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
               subtitle: Text('EOS', style: TextStyle(color: t.textSecondary, fontSize: 12)),
               onTap: () { Navigator.pop(context); _push(context, const ProfileScreen()); },
             ),
@@ -137,7 +139,10 @@ class _DrawerWidgetState extends State<DrawerWidget> {
         alignment: Alignment.center,
         child: Icon(icon, color: a, size: 18),
       ),
-      title: Text(label, style: TextStyle(color: t.textPrimary, fontSize: 15)),
+      title: Text(label,
+          style: t.neonGlow
+              ? TextStyle(color: t.textPrimary, fontSize: 15).withNeonGlow(a)
+              : TextStyle(color: t.textPrimary, fontSize: 15)),
       onTap: onTap,
     );
   }

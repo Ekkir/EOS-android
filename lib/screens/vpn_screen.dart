@@ -1,15 +1,38 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vpn_config.dart';
-import '../models/vpn_state.dart';
 import '../providers/vpn_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_surface.dart';
 import 'vpn_configs_screen.dart';
+import 'vpn_split_tunneling_screen.dart';
 
-class VpnScreen extends StatelessWidget {
+class VpnScreen extends StatefulWidget {
   const VpnScreen({super.key});
+
+  @override
+  State<VpnScreen> createState() => _VpnScreenState();
+}
+
+class _VpnScreenState extends State<VpnScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +40,12 @@ class VpnScreen extends StatelessWidget {
     final notifier = context.watch<AppThemeNotifier>();
     final t = notifier.current;
     final a = notifier.accent;
+
+    if (vpn.isBusy) {
+      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat();
+    } else {
+      if (_pulseCtrl.isAnimating) { _pulseCtrl.stop(); _pulseCtrl.reset(); }
+    }
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -89,7 +118,28 @@ class VpnScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _ConnectButton(vpn: vpn, t: t),
+                      AnimatedBuilder(
+                        animation: _pulseCtrl,
+                        builder: (_, child) => Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            if (vpn.isBusy) ...[
+                              _PulseRing(
+                                scale: 1.0 + _pulseCtrl.value * 0.5,
+                                opacity: (1.0 - _pulseCtrl.value).clamp(0.0, 1.0),
+                                color: a,
+                              ),
+                              _PulseRing(
+                                scale: 1.0 + ((_pulseCtrl.value + 0.5) % 1.0) * 0.5,
+                                opacity: (1.0 - (_pulseCtrl.value + 0.5) % 1.0).clamp(0.0, 1.0),
+                                color: a,
+                              ),
+                            ],
+                            child!,
+                          ],
+                        ),
+                        child: _ConnectButton(vpn: vpn, t: t),
+                      ),
                       const SizedBox(height: 20),
                       _StatusLabel(vpn: vpn, t: t),
                       const SizedBox(height: 32),
@@ -101,6 +151,7 @@ class VpnScreen extends StatelessWidget {
                 ),
               ),
               if (vpn.configs.isNotEmpty) _ConfigsList(vpn: vpn, t: t),
+              _SplitTunnelTile(t: t, a: a),
             ],
           ),
         ],
@@ -416,6 +467,84 @@ class _ConfigsList extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PulseRing extends StatelessWidget {
+  final double scale;
+  final double opacity;
+  final Color color;
+  const _PulseRing({required this.scale, required this.opacity, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.scale(
+      scale: scale,
+      child: Container(
+        width: 140, height: 140,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withValues(alpha: opacity * 0.55),
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SplitTunnelTile extends StatefulWidget {
+  final ThemeDef t;
+  final Color a;
+  const _SplitTunnelTile({required this.t, required this.a});
+
+  @override
+  State<_SplitTunnelTile> createState() => _SplitTunnelTileState();
+}
+
+class _SplitTunnelTileState extends State<_SplitTunnelTile> {
+  String _modeLabel = 'Выкл';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMode();
+  }
+
+  Future<void> _loadMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('vpn_split_mode') ?? 'none';
+    if (mounted) {
+      setState(() {
+        _modeLabel = _labelFor(mode);
+      });
+    }
+  }
+
+  String _labelFor(String mode) {
+    switch (mode) {
+      case 'whitelist': return 'Белый список';
+      case 'blacklist': return 'Чёрный список';
+      default: return 'Выкл';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(Icons.tune, color: widget.a),
+      title: Text('Раздельное туннелирование',
+          style: TextStyle(color: widget.t.textPrimary)),
+      subtitle: Text(_modeLabel,
+          style: TextStyle(color: widget.t.textSecondary, fontSize: 12)),
+      trailing: Icon(Icons.chevron_right, color: widget.t.textSecondary),
+      onTap: () async {
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const VpnSplitTunnelingScreen()));
+        _loadMode();
+      },
     );
   }
 }

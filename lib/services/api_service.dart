@@ -453,6 +453,18 @@ class ApiService {
     } catch (_) { return null; }
   }
 
+  Future<bool> getUserOnline(String username) async {
+    try {
+      final r = await http.get(
+        Uri.parse('${await _base}/users/${Uri.encodeComponent(username)}/online'),
+      ).timeout(const Duration(seconds: 5));
+      if (r.statusCode == 200) {
+        return (jsonDecode(r.body) as Map)['online'] == true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   // ── Друзья ──────────────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getFriends(String email) async {

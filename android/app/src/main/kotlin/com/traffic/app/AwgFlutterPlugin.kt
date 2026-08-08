@@ -63,9 +63,14 @@ class AwgFlutterPlugin(private val activity: MainActivity) :
         }
         try {
             Log.d(TAG, "Запуск VPN")
+            val splitMode = args["split_mode"] as? String ?: "none"
+            @Suppress("UNCHECKED_CAST")
+            val splitApps = (args["split_apps"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
             val intent = Intent(activity, AwgVpnService::class.java)
                 .setAction(AwgVpnService.ACTION_CONNECT)
                 .putExtra(AwgVpnService.EXTRA_CONFIG, uapi)
+                .putExtra(AwgVpnService.EXTRA_SPLIT_MODE, splitMode)
+                .putStringArrayListExtra(AwgVpnService.EXTRA_SPLIT_APPS, ArrayList(splitApps))
             activity.startForegroundService(intent)
         } catch (e: Throwable) {
             Log.e(TAG, "Не удалось запустить VPN сервис", e)

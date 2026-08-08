@@ -169,3 +169,12 @@ class AppThemeNotifier extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+extension NeonTextStyle on TextStyle {
+  TextStyle withNeonGlow(Color accent) => copyWith(
+    shadows: [
+      Shadow(color: accent.withValues(alpha: 0.8), blurRadius: 8),
+      Shadow(color: accent.withValues(alpha: 0.4), blurRadius: 20),
+    ],
+  );
+}

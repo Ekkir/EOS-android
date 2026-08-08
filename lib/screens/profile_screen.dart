@@ -13,7 +13,6 @@ import '../widgets/pixel_disintegration_wrapper.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
 import '../widgets/circular_avatar.dart';
-import 'admin_reports_screen.dart';
 import 'friends_screen.dart';
 import 'login_screen.dart';
 
@@ -487,31 +486,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ],
-              // Bug reports
-              const SizedBox(height: 12),
-              GlassCard(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AdminReportsScreen())),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Icon(Icons.bug_report_outlined, color: notifier.accent),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Отчёты об ошибках',
-                            style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w600)),
-                          Text('Читать и удалять',
-                            style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, color: t.textSecondary),
-                  ],
-                ),
-              ),
             ],
 
             const SizedBox(height: 12),

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vpn_config.dart';
 import '../models/vpn_state.dart';
 
@@ -14,7 +16,14 @@ class AwgChannel {
       .map((event) => VpnStatus.fromString(event as String));
 
   Future<void> connect(VpnConfig config) async {
-    await _methodChannel.invokeMethod<void>('connect', config.toJson());
+    final prefs = await SharedPreferences.getInstance();
+    final splitMode = prefs.getString('vpn_split_mode') ?? 'none';
+    final splitAppsJson = prefs.getString('vpn_split_apps') ?? '[]';
+    final splitApps = (jsonDecode(splitAppsJson) as List).cast<String>();
+    final args = Map<String, dynamic>.from(config.toJson());
+    args['split_mode'] = splitMode;
+    args['split_apps'] = splitApps;
+    await _methodChannel.invokeMethod<void>('connect', args);
   }
 
   Future<void> disconnect() async {

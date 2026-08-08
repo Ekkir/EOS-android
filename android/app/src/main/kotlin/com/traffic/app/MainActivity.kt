@@ -2,6 +2,7 @@ package com.traffic.app
 
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -78,6 +79,33 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("INSTALL_ERROR", e.message, null)
+                }
+            }
+
+        // ── Installed apps channel ────────────────────────────────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.traffic.app/apps")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "getInstalledApps") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                try {
+                    val launchIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                    }
+                    val apps = packageManager.queryIntentActivities(launchIntent, PackageManager.GET_META_DATA)
+                    val list = apps
+                        .map { info ->
+                            mapOf(
+                                "packageName" to info.activityInfo.packageName,
+                                "appName" to info.loadLabel(packageManager).toString()
+                            )
+                        }
+                        .filter { it["packageName"] != packageName }
+                        .sortedBy { it["appName"] }
+                    result.success(list)
+                } catch (e: Exception) {
+                    result.error("ERROR", e.message, null)
                 }
             }
 

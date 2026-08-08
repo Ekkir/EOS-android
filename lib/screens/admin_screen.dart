@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
+import 'admin_reports_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -101,6 +102,19 @@ class _AdminScreenState extends State<AdminScreen> {
                   _StatCard(stats: _stats!, theme: t),
                   const SizedBox(height: 12),
                 ],
+                const SizedBox(height: 12),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: Icon(Icons.bug_report_outlined, color: notifier.accent),
+                    title: Text('Отчёты об ошибках',
+                        style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
+                    trailing: Icon(Icons.chevron_right, color: t.textSecondary),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const AdminReportsScreen())),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 if (_log.isNotEmpty)
                   GlassCard(
                     padding: const EdgeInsets.all(12),

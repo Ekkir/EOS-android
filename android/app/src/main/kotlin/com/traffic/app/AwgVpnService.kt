@@ -21,6 +21,8 @@ class AwgVpnService : VpnService() {
         const val ACTION_CONNECT    = "com.traffic.app.awg.CONNECT"
         const val ACTION_DISCONNECT = "com.traffic.app.awg.DISCONNECT"
         const val EXTRA_CONFIG      = "awg_config"
+        const val EXTRA_SPLIT_MODE  = "split_mode"
+        const val EXTRA_SPLIT_APPS  = "split_apps"
 
         private const val NOTIFICATION_CHANNEL = "awg_vpn"
         private const val NOTIFICATION_ID = 1002
@@ -48,7 +50,9 @@ class AwgVpnService : VpnService() {
         return when (intent?.action) {
             ACTION_CONNECT -> {
                 val config = intent.getStringExtra(EXTRA_CONFIG)
-                if (config != null) startTunnel(config)
+                val splitMode = intent.getStringExtra(EXTRA_SPLIT_MODE) ?: "none"
+                val splitApps = intent.getStringArrayListExtra(EXTRA_SPLIT_APPS) ?: arrayListOf()
+                if (config != null) startTunnel(config, splitMode, splitApps)
                 START_STICKY
             }
             ACTION_DISCONNECT -> {
@@ -60,7 +64,7 @@ class AwgVpnService : VpnService() {
         }
     }
 
-    private fun startTunnel(uapiConfig: String) {
+    private fun startTunnel(uapiConfig: String, splitMode: String = "none", splitApps: List<String> = emptyList()) {
         try {
             onStatus?.invoke("connecting")
             @Suppress("NewApi")
@@ -117,6 +121,17 @@ class AwgVpnService : VpnService() {
             }
 
             try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
+
+            // Split tunneling
+            if (splitMode == "whitelist") {
+                for (pkg in splitApps) {
+                    try { builder.addAllowedApplication(pkg) } catch (_: Exception) {}
+                }
+            } else if (splitMode == "blacklist") {
+                for (pkg in splitApps) {
+                    try { builder.addDisallowedApplication(pkg) } catch (_: Exception) {}
+                }
+            }
 
             val pfd = builder.establish()
                 ?: throw IllegalStateException("VpnService.Builder.establish() вернул null")

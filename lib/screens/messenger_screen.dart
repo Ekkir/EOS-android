@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_theme.dart' show AppThemeNotifier, ThemeDef, NeonTextStyle;
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../models/message.dart';
@@ -68,6 +68,13 @@ class _MessengerScreenState extends State<MessengerScreen> {
   // Upload progress (null = not uploading)
   double? _uploadProgress;
 
+  // Online indicator for DM
+  bool _dmIsOnline = false;
+  Timer? _onlineTimer;
+
+  // IDs currently animating out on delete
+  final Set<int> _deletingIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +87,11 @@ class _MessengerScreenState extends State<MessengerScreen> {
       final prefs = context.read<PrefsService>();
       final name = _resolveSenderName(prefs);
       setState(() => _myName = name);
-      if (widget.channel.isDm) _initDmUser(name);
+      if (widget.channel.isDm) {
+        _initDmUser(name);
+        _pollOnline();
+        _onlineTimer = Timer.periodic(const Duration(seconds: 30), (_) => _pollOnline());
+      }
     });
   }
 
@@ -89,10 +100,18 @@ class _MessengerScreenState extends State<MessengerScreen> {
     currentChatChannelId = null;
     _timer?.cancel();
     _recordingTimer?.cancel();
+    _onlineTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     _recorder.dispose();
     super.dispose();
+  }
+
+  Future<void> _pollOnline() async {
+    if (_dmOtherUserName == null || !mounted) return;
+    final api = context.read<ApiService>();
+    final online = await api.getUserOnline(_dmOtherUserName!);
+    if (mounted) setState(() => _dmIsOnline = online);
   }
 
   Future<void> _fetchAdminName() async {
@@ -574,7 +593,14 @@ class _MessengerScreenState extends State<MessengerScreen> {
     final ok = await api.deleteMessage(widget.channel.id, msg.id);
     if (ok && mounted) {
       if (msg.mediaId.isNotEmpty) api.deleteMedia(msg.mediaId);
-      setState(() => _messages.removeWhere((m) => m.id == msg.id));
+      setState(() => _deletingIds.add(msg.id));
+      await Future.delayed(const Duration(milliseconds: 320));
+      if (mounted) {
+        setState(() {
+          _messages.removeWhere((m) => m.id == msg.id);
+          _deletingIds.remove(msg.id);
+        });
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Не удалось удалить сообщение')),
@@ -679,10 +705,27 @@ class _MessengerScreenState extends State<MessengerScreen> {
           child: Row(
             children: [
               widget.channel.isDm
-                  ? CircularAvatar(
-                      name: _dmDisplayName ?? _dmOtherUserName ?? '',
-                      bytes: _avatarCache[_dmOtherUserName ?? ''],
-                      radius: 18)
+                  ? Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircularAvatar(
+                            name: _dmDisplayName ?? _dmOtherUserName ?? '',
+                            bytes: _avatarCache[_dmOtherUserName ?? ''],
+                            radius: 18),
+                        if (_dmIsOnline)
+                          Positioned(
+                            right: 0, bottom: 0,
+                            child: Container(
+                              width: 10, height: 10,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00C853),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: t.nav, width: 1.5),
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
                   : CircleAvatar(
                       radius: 18,
                       backgroundColor: notifier.accent.withValues(alpha: 0.2),
@@ -728,24 +771,35 @@ class _MessengerScreenState extends State<MessengerScreen> {
                       final isMe = msg.sender == myName;
                       final showGlitch = _adminSenderName != null &&
                           msg.sender == _adminSenderName;
-                      return _AnimatedBubble(
+                      final isDeleting = _deletingIds.contains(msg.id);
+                      return AnimatedOpacity(
                         key: ValueKey(msg.id),
-                        animate: !_preloadedIds.contains(msg.id),
-                        child: _MessageBubble(
-                          message: msg,
-                          isMe: isMe,
-                          isRead: _isRead(msg),
-                          theme: t,
-                          timeStr: _formatTime(msg.ts),
-                          avatarBytes: _avatarCache[msg.sender],
-                          showGlitch: showGlitch,
-                          showAdminRing: showGlitch,
-                          adminAvatarEffect: _adminAvatarEffect,
-                          loadMedia: msg.hasMedia ? () => _loadMedia(msg.mediaId) : null,
-                          onSaveMedia: msg.hasMedia
-                              ? (bytes) => _saveMedia(bytes, msg.mediaId, msg.type, msg.text)
-                              : null,
-                          onLongPress: (offset) => _showMessageMenu(msg, isMe, offset),
+                        opacity: isDeleting ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          constraints: isDeleting
+                              ? const BoxConstraints(maxHeight: 0)
+                              : const BoxConstraints(),
+                          child: _AnimatedBubble(
+                            animate: !_preloadedIds.contains(msg.id),
+                            child: _MessageBubble(
+                              message: msg,
+                              isMe: isMe,
+                              isRead: _isRead(msg),
+                              theme: t,
+                              timeStr: _formatTime(msg.ts),
+                              avatarBytes: _avatarCache[msg.sender],
+                              showGlitch: showGlitch,
+                              showAdminRing: showGlitch,
+                              adminAvatarEffect: _adminAvatarEffect,
+                              loadMedia: msg.hasMedia ? () => _loadMedia(msg.mediaId) : null,
+                              onSaveMedia: msg.hasMedia
+                                  ? (bytes) => _saveMedia(bytes, msg.mediaId, msg.type, msg.text)
+                                  : null,
+                              onLongPress: (offset) => _showMessageMenu(msg, isMe, offset),
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -1191,7 +1245,9 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent  = context.read<AppThemeNotifier>().accent;
+    final notifier = context.read<AppThemeNotifier>();
+    final accent  = notifier.accent;
+    final neon = theme.neonGlow;
     final isCircle = message.type == 'video_circle';
     final isImage = message.type == 'image' && loadMedia != null;
     final isGlass = theme.isLiquidGlass || theme.glassy;
@@ -1293,7 +1349,9 @@ class _MessageBubble extends StatelessWidget {
               msgText: message.text,
             )
           else
-            Text(message.text, style: TextStyle(color: textColor, fontSize: 15)),
+            Text(message.text, style: neon
+                ? TextStyle(color: textColor, fontSize: 15).withNeonGlow(accent)
+                : TextStyle(color: textColor, fontSize: 15)),
           const SizedBox(height: 2),
           Row(
             mainAxisSize: MainAxisSize.min,

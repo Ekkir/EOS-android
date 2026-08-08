@@ -276,6 +276,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: t.bg,
       drawer: const DrawerWidget(),
+      drawerEnableOpenDragGesture: true,
+      drawerEdgeDragWidth: 60,
       body: SafeArea(
         child: Stack(
           children: [
