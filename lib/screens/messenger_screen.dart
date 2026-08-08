@@ -1089,9 +1089,12 @@ class _MediaMessageWidgetState extends State<_MediaMessageWidget> {
         if (widget.msgType == 'image') {
           return GestureDetector(
             onTap: () => _openFullscreen(ctx, snap.data!),
-            child: SizedBox(
-              width: 200, height: 150,
-              child: Image.memory(snap.data!, fit: BoxFit.cover, width: 200, height: 150),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 200, height: 150,
+                child: Image.memory(snap.data!, fit: BoxFit.cover, width: 200, height: 150),
+              ),
             ),
           );
         }
@@ -1297,10 +1300,7 @@ class _MessageBubble extends StatelessWidget {
                 maxWidth: MediaQuery.of(context).size.width * 0.72,
               ),
               child: isImage
-                  ? ClipRRect(
-                      borderRadius: borderRadius,
-                      child: buildBubbleContent(),
-                    )
+                  ? buildBubbleContent()
                   : isGlass
                       ? ClipRRect(
                           borderRadius: borderRadius,
