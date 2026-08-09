@@ -1,3 +1,4 @@
+import 'dart:math' show sin, pi;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -313,12 +314,73 @@ class _TrafficItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 18),
+        _AnimatedArrow(isUp: icon == Icons.arrow_upward, color: color),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15)),
         const SizedBox(height: 2),
         Text(label, style: TextStyle(color: Colors.white54, fontSize: 11)),
       ],
+    );
+  }
+}
+
+class _AnimatedArrow extends StatefulWidget {
+  final bool isUp;
+  final Color color;
+  const _AnimatedArrow({required this.isUp, required this.color});
+
+  @override
+  State<_AnimatedArrow> createState() => _AnimatedArrowState();
+}
+
+class _AnimatedArrowState extends State<_AnimatedArrow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final direction = widget.isUp ? -1.0 : 1.0;
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, __) {
+          final t = _ctrl.value;
+          // стрелка движется в направлении потока данных
+          final dy = direction * (t - 0.5) * 20.0;
+          // плавно появляется и исчезает через sin(t*π)
+          final opacity = sin(t * pi).clamp(0.0, 1.0);
+          return ClipRect(
+            child: Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(0, dy),
+                child: Icon(
+                  widget.isUp ? Icons.arrow_upward : Icons.arrow_downward,
+                  color: widget.color,
+                  size: 18,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
