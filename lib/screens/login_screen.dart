@@ -4,7 +4,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import '../services/prefs_service.dart';
 import '../services/api_service.dart';
-import 'home_screen.dart';
+import '../services/device_id_service.dart';
+import 'main_shell.dart';
+import 'approval_pending_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -80,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       await prefs.setProfileName(desiredName);
       if (!mounted) return;
-      _goHome();
+      await _checkApprovalAndNavigate(prefs, api, _googleEmail, desiredName);
     } catch (_) {
       setState(() { _loading = false; _error = 'Ошибка входа. Попробуйте ещё раз.'; });
     }
@@ -110,13 +112,43 @@ class _LoginScreenState extends State<LoginScreen>
 
     await prefs.setProfileName(name);
     if (!mounted) return;
-    _goHome();
+    await _checkApprovalAndNavigate(prefs, api, _googleEmail, name);
+  }
+
+  Future<void> _checkApprovalAndNavigate(
+    PrefsService prefs, ApiService api, String email, String displayName) async {
+    if (prefs.isAdmin) {
+      _goHome();
+      return;
+    }
+    final device = await DeviceIdService.get();
+    await prefs.setDeviceId(device.id);
+    final status = await api.requestApproval(
+      email: email,
+      displayName: displayName,
+      deviceId: device.id,
+      deviceName: device.name,
+    );
+    await prefs.setApprovalStatus(status);
+    if (!mounted) return;
+    if (status == 'approved') {
+      _goHome();
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const ApprovalPendingScreen(),
+          transitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+      );
+    }
   }
 
   void _goHome() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const HomeScreen(),
+        pageBuilder: (_, __, ___) => const MainShell(),
         transitionDuration: const Duration(milliseconds: 400),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),

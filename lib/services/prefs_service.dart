@@ -121,6 +121,75 @@ class PrefsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Плашки главной страницы ────────────────────────────────────────────
+  static const _keyHiddenTiles = 'home_hidden_tiles';
+  static const _defaultTileOrder = ['traffic', 'map', 'cameras', 'chats', 'vpn', 'car', 'music'];
+
+  static const _defaultHiddenTiles = ['music'];
+
+  Set<String> get hiddenHomeTiles =>
+      Set<String>.from(_prefs.getStringList(_keyHiddenTiles) ?? _defaultHiddenTiles);
+
+  bool isTileVisible(String key) => !hiddenHomeTiles.contains(key);
+
+  Future<void> setTileVisible(String key, bool visible) async {
+    final hidden = hiddenHomeTiles;
+    if (visible) { hidden.remove(key); } else { hidden.add(key); }
+    await _prefs.setStringList(_keyHiddenTiles, hidden.toList());
+    notifyListeners();
+  }
+
+  List<String> get tileOrder {
+    final saved = _prefs.getStringList('home_tile_order');
+    if (saved != null && saved.toSet().containsAll(_defaultTileOrder)) return saved;
+    return List.from(_defaultTileOrder);
+  }
+
+  Future<void> setTileOrder(List<String> order) async {
+    await _prefs.setStringList('home_tile_order', order);
+    notifyListeners();
+  }
+
+  bool get squareTiles => _prefs.getBool('square_tiles') ?? false;
+
+  Future<void> setSquareTiles(bool v) async {
+    await _prefs.setBool('square_tiles', v);
+    notifyListeners();
+  }
+
+  // ── Настройки чатов ────────────────────────────────────────────────────────
+  static const _keyChatBgType   = 'chat_bg_type';
+  static const _keyChatBgColor1 = 'chat_bg_color1';
+  static const _keyChatBgColor2 = 'chat_bg_color2';
+  static const _keyChatBgImage  = 'chat_bg_image';
+  static const _keyChatTextSize = 'chat_text_size';
+  static const _keyChatAnim     = 'chat_msg_animation';
+
+  int    get chatBgType   => _prefs.getInt(_keyChatBgType)       ?? 0;
+  int    get chatBgColor1 => _prefs.getInt(_keyChatBgColor1)     ?? 0xFF000000;
+  int    get chatBgColor2 => _prefs.getInt(_keyChatBgColor2)     ?? 0xFF1A0030;
+  String? get chatBgImage => _prefs.getString(_keyChatBgImage);
+  double get chatTextSize => _prefs.getDouble(_keyChatTextSize)  ?? 15.0;
+  String get chatAnimation => _prefs.getString(_keyChatAnim)     ?? 'none';
+
+  Future<void> setChatBg(int type, {int? color1, int? color2, String? imagePath}) async {
+    await _prefs.setInt(_keyChatBgType, type);
+    if (color1 != null) await _prefs.setInt(_keyChatBgColor1, color1);
+    if (color2 != null) await _prefs.setInt(_keyChatBgColor2, color2);
+    if (imagePath != null) await _prefs.setString(_keyChatBgImage, imagePath);
+    notifyListeners();
+  }
+
+  Future<void> setChatTextSize(double v) async {
+    await _prefs.setDouble(_keyChatTextSize, v.clamp(11.0, 22.0));
+    notifyListeners();
+  }
+
+  Future<void> setChatAnimation(String v) async {
+    await _prefs.setString(_keyChatAnim, v);
+    notifyListeners();
+  }
+
   // ── Версия аватара (для обновления Drawer) ─────────────────────────────
   int get avatarVersion => _prefs.getInt('avatar_version') ?? 0;
   Future<void> incrementAvatarVersion() async {
@@ -155,4 +224,55 @@ class PrefsService extends ChangeNotifier {
     await _prefs.setDouble('disint_speed', v);
     notifyListeners();
   }
+
+  // ── Безопасность ──────────────────────────────────────────────────────────────
+  static const _keySecurityEnabled  = 'security_enabled';
+  static const _keyPinCode          = 'pin_code';
+  static const _keyBiometricEnabled = 'biometric_enabled';
+
+  bool   get securityEnabled  => _prefs.getBool(_keySecurityEnabled)  ?? false;
+  String get pinCode          => _prefs.getString(_keyPinCode)        ?? '';
+  bool   get biometricEnabled => _prefs.getBool(_keyBiometricEnabled) ?? false;
+
+  Future<void> setSecurityEnabled(bool v) async {
+    await _prefs.setBool(_keySecurityEnabled, v);
+    notifyListeners();
+  }
+  Future<void> setPinCode(String v) async {
+    await _prefs.setString(_keyPinCode, v);
+    notifyListeners();
+  }
+  Future<void> setBiometricEnabled(bool v) async {
+    await _prefs.setBool(_keyBiometricEnabled, v);
+    notifyListeners();
+  }
+
+  // ── Настройки панели навигации ─────────────────────────────────────────────
+  static const _keyNavAnim = 'nav_bar_animation';
+  String get navBarAnimation => _prefs.getString(_keyNavAnim) ?? 'scale';
+  Future<void> setNavBarAnimation(String v) async {
+    await _prefs.setString(_keyNavAnim, v);
+    notifyListeners();
+  }
+
+  static const _keyNavPillTransition = 'nav_pill_transition';
+  String get navPillTransition => _prefs.getString(_keyNavPillTransition) ?? 'none';
+  Future<void> setNavPillTransition(String v) async {
+    await _prefs.setString(_keyNavPillTransition, v);
+    notifyListeners();
+  }
+
+  // ── Одобрение пользователей ────────────────────────────────────────────────
+  static const _keyApprovalStatus = 'approval_status';
+  static const _keyDeviceId       = 'device_id';
+
+  String get approvalStatus => _prefs.getString(_keyApprovalStatus) ?? 'pending';
+  Future<void> setApprovalStatus(String s) async {
+    await _prefs.setString(_keyApprovalStatus, s);
+    notifyListeners();
+  }
+
+  String get deviceId => _prefs.getString(_keyDeviceId) ?? '';
+  Future<void> setDeviceId(String id) async =>
+      _prefs.setString(_keyDeviceId, id);
 }

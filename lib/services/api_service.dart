@@ -15,6 +15,19 @@ class ApiService {
   ApiService(this.prefs);
 
   Future<String> get _base => ServerUrlResolver.resolve(prefs);
+  Future<String> get baseUrl => _base;
+
+  // ── Музыка ──────────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getMusicTracks() async {
+    final r = await http.get(Uri.parse('${await _base}/music'))
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode == 200) {
+      final list = jsonDecode(r.body) as List;
+      return list.cast<Map<String, dynamic>>();
+    }
+    throw Exception('status ${r.statusCode}');
+  }
 
   // ── Трафик ──────────────────────────────────────────────────────────────
 
@@ -561,6 +574,121 @@ class ApiService {
       final encoded = Uri.encodeComponent(channelId);
       final r = await http.delete(Uri.parse('${await _base}/channels/$encoded'))
           .timeout(const Duration(seconds: 8));
+      return r.statusCode == 200;
+    } catch (_) { return false; }
+  }
+
+  // ── Позиции маркеров светофоров ─────────────────────────────────────────────
+
+  Future<Map<String, List<double>>> getCrossroadPositions() async {
+    try {
+      final r = await http.get(Uri.parse('${await _base}/crossroad_positions'))
+          .timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) {
+        final map = jsonDecode(r.body) as Map<String, dynamic>;
+        return map.map((k, v) => MapEntry(k, (v as List).map((e) => (e as num).toDouble()).toList()));
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  Future<bool> setCrossroadPosition(String id, double lat, double lon) async {
+    try {
+      final r = await http.post(Uri.parse('${await _base}/crossroad_positions'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'id': id, 'lat': lat, 'lon': lon}))
+          .timeout(const Duration(seconds: 8));
+      return r.statusCode == 200;
+    } catch (_) { return false; }
+  }
+
+  // ── Статус прочтения сообщений ───────────────────────────────────────────────
+
+  Future<void> markRead(String channelId, String user, int messageId) async {
+    try {
+      final encoded = Uri.encodeComponent(channelId);
+      await http.post(Uri.parse('${await _base}/channels/$encoded/mark_read'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'user': user, 'message_id': messageId}))
+          .timeout(const Duration(seconds: 6));
+    } catch (_) {}
+  }
+
+  Future<Map<String, int>> getReadStatus(String channelId) async {
+    try {
+      final encoded = Uri.encodeComponent(channelId);
+      final r = await http.get(Uri.parse('${await _base}/channels/$encoded/read_status'))
+          .timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) {
+        final map = jsonDecode(r.body) as Map<String, dynamic>;
+        return map.map((k, v) => MapEntry(k, (v as num).toInt()));
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  // ── Одобрение пользователей ──────────────────────────────────────────────────
+
+  Future<String> requestApproval({
+    required String email,
+    required String displayName,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    try {
+      final r = await http.post(Uri.parse('${await _base}/approval/request'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email':        email,
+            'display_name': displayName,
+            'device_id':    deviceId,
+            'device_name':  deviceName,
+          })).timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        return (jsonDecode(r.body) as Map)['status'] as String? ?? 'pending';
+      }
+    } catch (_) {}
+    return 'pending';
+  }
+
+  Future<String> getApprovalStatus(String email) async {
+    try {
+      final r = await http.get(
+        Uri.parse('${await _base}/approval/status?email=${Uri.encodeComponent(email)}'),
+      ).timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) {
+        return (jsonDecode(r.body) as Map)['status'] as String? ?? 'pending';
+      }
+    } catch (_) {}
+    return prefs.approvalStatus;
+  }
+
+  Future<List<Map<String, dynamic>>> getAdminUsers() async {
+    try {
+      final r = await http.get(Uri.parse('${await _base}/admin/users'))
+          .timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) {
+        final list = jsonDecode(r.body) as List;
+        return list.map((e) => e as Map<String, dynamic>).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<bool> approveUser(String email) async {
+    try {
+      final r = await http.post(Uri.parse('${await _base}/admin/approve'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
+      return r.statusCode == 200;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> rejectUser(String email) async {
+    try {
+      final r = await http.post(Uri.parse('${await _base}/admin/reject'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (_) { return false; }
   }

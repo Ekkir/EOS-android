@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
 import 'admin_reports_screen.dart';
+import 'admin_users_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -102,6 +103,20 @@ class _AdminScreenState extends State<AdminScreen> {
                   _StatCard(stats: _stats!, theme: t),
                   const SizedBox(height: 12),
                 ],
+                const SizedBox(height: 12),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: Icon(Icons.people_outlined, color: notifier.accent),
+                    title: Text('Пользователи',
+                        style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
+                    subtitle: Text('Одобрение доступа',
+                        style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                    trailing: Icon(Icons.chevron_right, color: t.textSecondary),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 GlassCard(
                   padding: EdgeInsets.zero,
