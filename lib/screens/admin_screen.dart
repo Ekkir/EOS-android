@@ -18,6 +18,7 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> {
   Map<String, dynamic>? _stats;
   List<String> _log = [];
+  List<Map<String, dynamic>> _pending = [];
   Timer? _timer;
   bool _loading = true;
   bool _restarting = false;
@@ -38,13 +39,25 @@ class _AdminScreenState extends State<AdminScreen> {
   Future<void> _fetch() async {
     final api = context.read<ApiService>();
     final stats = await api.getStats();
-    final log = await api.getLog();
+    final log   = await api.getLog();
+    final users = await api.getAdminUsers();
     if (!mounted) return;
     setState(() {
-      _stats = stats;
-      _log = log;
+      _stats   = stats;
+      _log     = log;
+      _pending = users.where((u) => u['status'] == 'pending').toList();
       _loading = false;
     });
+  }
+
+  Future<void> _approve(String email) async {
+    await context.read<ApiService>().approveUser(email);
+    _fetch();
+  }
+
+  Future<void> _reject(String email) async {
+    await context.read<ApiService>().rejectUser(email);
+    _fetch();
   }
 
   Future<void> _restart() async {
@@ -104,6 +117,116 @@ class _AdminScreenState extends State<AdminScreen> {
                   const SizedBox(height: 12),
                 ],
                 const SizedBox(height: 12),
+                // ── Ожидают подтверждения ─────────────────────────────────
+                if (_pending.isNotEmpty) ...[
+                  GlassCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.hourglass_top_rounded, color: Colors.amber, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Ожидают подтверждения',
+                                style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold, fontSize: 15)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text('${_pending.length}',
+                                  style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ..._pending.map((u) {
+                          final name   = u['display_name'] as String? ?? '';
+                          final email  = u['email']        as String? ?? '';
+                          final device = u['device_name']  as String? ?? '';
+                          final initials = name.isNotEmpty
+                              ? name.trim().split(' ').map((p) => p.isNotEmpty ? p[0] : '').take(2).join().toUpperCase()
+                              : '?';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: notifier.accent.withValues(alpha: 0.2),
+                                      child: Text(initials,
+                                          style: TextStyle(color: notifier.accent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(name.isNotEmpty ? name : email,
+                                              style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+                                          Text(email,
+                                              style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                                          if (device.isNotEmpty)
+                                            Text(device,
+                                                style: TextStyle(color: t.textSecondary, fontSize: 11)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _approve(email),
+                                        icon: const Icon(Icons.check, size: 15),
+                                        label: const Text('Одобрить', style: TextStyle(fontSize: 13)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.greenAccent.shade700,
+                                          foregroundColor: Colors.black,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () => _reject(email),
+                                        icon: const Icon(Icons.close, size: 15),
+                                        label: const Text('Отклонить', style: TextStyle(fontSize: 13)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.redAccent,
+                                          side: const BorderSide(color: Colors.redAccent),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: ListTile(
@@ -112,9 +235,25 @@ class _AdminScreenState extends State<AdminScreen> {
                         style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
                     subtitle: Text('Одобрение доступа',
                         style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                    trailing: Icon(Icons.chevron_right, color: t.textSecondary),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_pending.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text('${_pending.length}',
+                                style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        Icon(Icons.chevron_right, color: t.textSecondary),
+                      ],
+                    ),
                     onTap: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
+                        MaterialPageRoute(builder: (_) => const AdminUsersScreen())).then((_) => _fetch()),
                   ),
                 ),
                 const SizedBox(height: 12),
