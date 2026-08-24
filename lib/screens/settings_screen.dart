@@ -6,6 +6,7 @@ import '../services/prefs_service.dart';
 import '../services/nav_bar_controller.dart';
 import '../widgets/glitch_wrapper.dart';
 import '../widgets/circular_avatar.dart';
+import '../services/api_service.dart';
 import 'connection_screen.dart';
 import 'themes_screen.dart';
 import 'admin_screen.dart';
@@ -61,6 +62,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _onTheme() { if (mounted) setState(() {}); }
 
+  Future<void> _openWithPassword(BuildContext ctx, Widget Function() builder) async {
+    final pwCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('Введите пароль'),
+        content: TextField(
+          controller: pwCtrl,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Пароль администратора',
+            prefixIcon: Icon(Icons.lock_outline),
+          ),
+          onSubmitted: (_) => Navigator.pop(dCtx, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Войти')),
+        ],
+      ),
+    );
+    if (confirmed != true || !ctx.mounted) return;
+    final password = pwCtrl.text;
+    pwCtrl.dispose();
+    if (password.isEmpty) return;
+    final api = ctx.read<ApiService>();
+    final ok = await api.checkAdmin(password);
+    if (!ctx.mounted) return;
+    if (ok) {
+      Navigator.push(ctx, MaterialPageRoute(builder: (_) => builder()));
+    } else {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Неверный пароль')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _themeNotifier?.removeListener(_onTheme);
@@ -84,14 +123,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameOpacity = (1.0 - progress * 1.5).clamp(0.0, 1.0);
 
     final group1 = <_TileData>[
-      _TileData(
+      if (prefs.isAdmin) _TileData(
         icon: (t) => _themeIcon(t, Icons.wifi,
           pixel: Icons.wifi_rounded, glass: Icons.water_drop,
           neon: Icons.electric_bolt, cyber: Icons.signal_cellular_alt_rounded,
           minimal: Icons.link),
         label: 'Подключение', subtitle: 'URL сервера',
         color: const Color(0xFF448AFF),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectionScreen())),
+        onTap: () => _openWithPassword(context, () => const ConnectionScreen()),
       ),
       _TileData(
         icon: (t) => _themeIcon(t, Icons.palette,
@@ -106,7 +145,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         icon: (t) => Icons.admin_panel_settings_rounded,
         label: 'Администратор', subtitle: 'Статистика и управление',
         color: const Color(0xFFFF6D00),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+        onTap: () => _openWithPassword(context, () => const AdminScreen()),
       ),
       _TileData(
         icon: (t) => _themeIcon(t, Icons.dashboard_customize_outlined,

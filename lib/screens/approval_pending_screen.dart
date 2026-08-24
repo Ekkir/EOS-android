@@ -7,10 +7,19 @@ import 'main_shell.dart';
 import 'login_screen.dart';
 
 class ApprovalPendingScreen extends StatefulWidget {
-  /// Если не null — значит пользователя выбросило из приложения.
-  /// 'suspended' | 'rejected'
+  /// 'suspended' | 'rejected' — причина выброса. null — обычное ожидание.
   final String? revokedFrom;
-  const ApprovalPendingScreen({super.key, this.revokedFrom});
+  /// Если true — пропустить экран ревокации (уже показан анимацией).
+  final bool skipRevocation;
+  /// Цвет фона терминала (передаётся из RevokedAnimation для бесшовного перехода).
+  final Color? termBg;
+
+  const ApprovalPendingScreen({
+    super.key,
+    this.revokedFrom,
+    this.skipRevocation = false,
+    this.termBg,
+  });
 
   @override
   State<ApprovalPendingScreen> createState() => _ApprovalPendingScreenState();
@@ -68,9 +77,28 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
     await _wait(200);
 
     if (widget.revokedFrom != null) {
-      await _runRevocationSequence(widget.revokedFrom!);
+      if (widget.skipRevocation) {
+        await _runPostRevocationSequence(widget.revokedFrom!);
+      } else {
+        await _runRevocationSequence(widget.revokedFrom!);
+      }
     } else {
       await _runWaitingSequence();
+    }
+  }
+
+  // Вход сразу в standby / logout — когда ревокация уже показана анимацией.
+  Future<void> _runPostRevocationSequence(String status) async {
+    final isSuspended = status == 'suspended';
+    await _type('> redirect.to_standby()', _dim, 16);
+    _add('', _dim);
+    if (isSuspended) {
+      await _type('  Ожидание подтверждения ключа доступа', _yellow, 14);
+      _add('', _dim);
+      _startDots();
+    } else {
+      setState(() => _rejected = true);
+      await _type('> auth.logout --force', _dim, 16);
     }
   }
 
@@ -229,17 +257,33 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
+  // Gradient based on termBg (from animation) or default blue-dark
+  BoxDecoration get _bgDecoration {
+    if (widget.termBg != null) {
+      final base = widget.termBg!;
+      final mid  = Color.lerp(base, Colors.black, 0.3)!;
+      return BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [base, mid, base],
+        ),
+      );
+    }
+    return const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [_bg1, _bg2, _bg3],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_bg1, _bg2, _bg3],
-          ),
-        ),
+        decoration: _bgDecoration,
         child: SafeArea(
           child: Column(
             children: [

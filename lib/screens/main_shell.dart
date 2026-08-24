@@ -11,7 +11,7 @@ import 'home_screen.dart';
 import 'friends_screen.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
-import 'approval_pending_screen.dart';
+import '../widgets/revoked_animation.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -105,9 +105,8 @@ class _MainShellState extends State<MainShell> with RouteAware {
   void _goToRevoked(String status) {
     Navigator.of(context).pushAndRemoveUntil(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => ApprovalPendingScreen(revokedFrom: status),
-        transitionDuration: const Duration(milliseconds: 350),
-        transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+        pageBuilder: (_, __, ___) => RevokedAnimation(status: status),
+        transitionDuration: Duration.zero,
       ),
       (_) => false,
     );

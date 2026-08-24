@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/traffic_state.dart';
@@ -14,8 +15,15 @@ class ApiService {
   final PrefsService prefs;
   ApiService(this.prefs);
 
+  String? _adminToken;
+
   Future<String> get _base => ServerUrlResolver.resolve(prefs);
   Future<String> get baseUrl => _base;
+
+  Map<String, String> get _adminHeaders => {
+    'Content-Type': 'application/json',
+    if (_adminToken != null) 'X-Admin-Token': _adminToken!,
+  };
 
   // ── Музыка ──────────────────────────────────────────────────────────────
 
@@ -393,13 +401,18 @@ class ApiService {
   }
 
   Future<bool> checkAdmin(String password) async {
+    final hash = sha256.convert(utf8.encode(password)).toString();
     try {
       final r = await http.post(Uri.parse('${await _base}/check_admin'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'password': password}))
+          body: jsonEncode({'password_hash': hash}))
           .timeout(const Duration(seconds: 8));
-      return r.statusCode == 200;
-    } catch (_) { return false; }
+      if (r.statusCode == 200) {
+        _adminToken = hash;
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   Future<bool> deleteMessage(String channel, int id) async {
@@ -665,8 +678,10 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getAdminUsers() async {
     try {
-      final r = await http.get(Uri.parse('${await _base}/admin/users'))
-          .timeout(const Duration(seconds: 8));
+      final r = await http.get(
+        Uri.parse('${await _base}/admin/users'),
+        headers: _adminHeaders,
+      ).timeout(const Duration(seconds: 8));
       if (r.statusCode == 200) {
         final list = jsonDecode(r.body) as List;
         return list.map((e) => e as Map<String, dynamic>).toList();
@@ -678,7 +693,7 @@ class ApiService {
   Future<bool> approveUser(String email) async {
     try {
       final r = await http.post(Uri.parse('${await _base}/admin/approve'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _adminHeaders,
           body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (_) { return false; }
@@ -687,7 +702,7 @@ class ApiService {
   Future<bool> rejectUser(String email) async {
     try {
       final r = await http.post(Uri.parse('${await _base}/admin/reject'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _adminHeaders,
           body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (_) { return false; }
@@ -696,7 +711,7 @@ class ApiService {
   Future<bool> suspendUser(String email) async {
     try {
       final r = await http.post(Uri.parse('${await _base}/admin/suspend'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _adminHeaders,
           body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (_) { return false; }
