@@ -3,6 +3,10 @@ package com.traffic.app
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -14,6 +18,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 class MainActivity : FlutterActivity() {
@@ -23,10 +28,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private var awgPlugin: AwgFlutterPlugin? = null
+    private var musicPlugin: MusicNotificationPlugin? = null
     var pendingConnectArgs: Map<String, Any?>? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // ── Media Session / Music Notification ───────────────────────────────
+        val musicChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.traffic.app/music_session"
+        )
+        musicPlugin = MusicNotificationPlugin(applicationContext, musicChannel)
+        musicChannel.setMethodCallHandler(musicPlugin)
 
         // ── AmneziaWG VPN channels ────────────────────────────────────────────
         val plugin = AwgFlutterPlugin(this)
@@ -85,27 +99,44 @@ class MainActivity : FlutterActivity() {
         // ── Installed apps channel ────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.traffic.app/apps")
             .setMethodCallHandler { call, result ->
-                if (call.method != "getInstalledApps") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-                try {
-                    val launchIntent = Intent(Intent.ACTION_MAIN, null).apply {
-                        addCategory(Intent.CATEGORY_LAUNCHER)
-                    }
-                    val apps = packageManager.queryIntentActivities(launchIntent, PackageManager.GET_META_DATA)
-                    val list = apps
-                        .map { info ->
-                            mapOf(
-                                "packageName" to info.activityInfo.packageName,
-                                "appName" to info.loadLabel(packageManager).toString()
-                            )
+                when (call.method) {
+                    "getInstalledApps" -> {
+                        try {
+                            val launchIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                                addCategory(Intent.CATEGORY_LAUNCHER)
+                            }
+                            val apps = packageManager.queryIntentActivities(launchIntent, PackageManager.GET_META_DATA)
+                            val list = apps
+                                .map { info ->
+                                    mapOf(
+                                        "packageName" to info.activityInfo.packageName,
+                                        "appName" to info.loadLabel(packageManager).toString()
+                                    )
+                                }
+                                .filter { it["packageName"] != packageName }
+                                .sortedBy { it["appName"] }
+                            result.success(list)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
                         }
-                        .filter { it["packageName"] != packageName }
-                        .sortedBy { it["appName"] }
-                    result.success(list)
-                } catch (e: Exception) {
-                    result.error("ERROR", e.message, null)
+                    }
+                    "getAppIcon" -> {
+                        val pkgName = call.argument<String>("packageName")
+                        if (pkgName == null) {
+                            result.error("INVALID_ARG", "packageName is null", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val drawable = packageManager.getApplicationIcon(pkgName)
+                            val bitmap = drawableToBitmap(drawable, 48)
+                            val stream = ByteArrayOutputStream()
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 90, stream)
+                            result.success(stream.toByteArray())
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
             }
 
@@ -132,6 +163,11 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    override fun onDestroy() {
+        musicPlugin?.dispose()
+        super.onDestroy()
+    }
+
     @Deprecated("Deprecated but still needed for API < 33 compat")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -152,6 +188,19 @@ class MainActivity : FlutterActivity() {
                 AwgVpnService.onStatus?.invoke("error:VPN permission denied")
             }
         }
+    }
+
+    private fun drawableToBitmap(drawable: Drawable, size: Int): Bitmap {
+        if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            return Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+        }
+        val w = drawable.intrinsicWidth.coerceAtLeast(1)
+        val h = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        drawable.setBounds(0, 0, w, h)
+        drawable.draw(canvas)
+        return Bitmap.createScaledBitmap(bmp, size, size, true)
     }
 
     private fun saveToDownloads(bytes: ByteArray, fileName: String, mimeType: String): String {

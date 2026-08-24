@@ -13,7 +13,7 @@ Kotlin-версия (`M:\Project vscode\TrafficApp\`) — только как а
 
 ## Ключевые детали
 - Package: `com.traffic.app`
-- Текущая версия: **1.1.86** (pubspec: `1.1.86+88`; следующий: `1.1.87+89`)
+- Текущая версия: **1.2.13** (pubspec: `1.2.13+115`; следующий: `1.2.14+116`)
 - Admin email: `razzorenovkiril@gmail.com` (в `PrefsService.adminEmail`)
 
 ## Серверы и доступы
@@ -82,6 +82,11 @@ lib/
     about_screen.dart          # GitHub ссылка; фоновое скачивание через DownloadState
     themes_screen.dart         # выбор темы + цвет акцента (готовые + HEX) + кнопка сброса
     profile_screen.dart        # эффекты аватара: aurora/glitch/disintegration/none
+    login_screen.dart          # Google Sign-In → TerminalAuthScreen (не-admin) или MainShell (admin)
+    terminal_auth_screen.dart  # анимация терминала при входе; опрос статуса каждые 10с до ответа
+                               # обрабатывает: approved→MainShell, rejected→диалог+выход, suspended→диалог+ожидание
+    approval_pending_screen.dart  # экран ожидания при рестарте (suspended/pending): адаптивный UI по статусу
+    admin_users_screen.dart    # список пользователей: pending/approved/suspended/rejected; кнопки действий
     bug_report_screen.dart     # отчёт об ошибке
     admin_reports_screen.dart  # список отчётов + удаление (только admin)
     user_profile_screen.dart   # при email!=null → прямой поиск профиля; AdminAvatarWidget
@@ -125,6 +130,9 @@ android/
 - DM имена: `'name': dm_id[3:]` (без префикса `dm_`)
 - Маршруты: `/messages DELETE`, `/profile/name/<path:name>`, `/bug_reports CRUD`
 - bug_reports.json — персистентное хранение на диске
+- approvals.json — пользователи: статусы `pending`/`approved`/`rejected`/`suspended`
+- Эндпоинты одобрения: `POST /approval/request`, `GET /approval/status`, `GET /admin/users`
+- `POST /admin/approve`, `POST /admin/reject`, `POST /admin/suspend`
 
 ## Важные особенности
 - Workmanager 0.9.x: `ExistingPeriodicWorkPolicy` (не `ExistingWorkPolicy`)

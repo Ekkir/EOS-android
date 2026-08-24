@@ -58,14 +58,47 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
   }
 
+  Future<void> _revoke(String email) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final t = Provider.of<AppThemeNotifier>(ctx).current;
+        return AlertDialog(
+          backgroundColor: t.surface,
+          title: Text('Отозвать доступ', style: TextStyle(color: t.textPrimary)),
+          content: Text(
+            'Пользователь $email потеряет доступ к приложению при следующем запуске.',
+            style: TextStyle(color: t.textSecondary),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Отмена', style: TextStyle(color: t.textSecondary))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Отозвать', style: TextStyle(color: Colors.orange))),
+          ],
+        );
+      },
+    );
+    if (ok == true) {
+      await context.read<ApiService>().rejectUser(email);
+      _load();
+    }
+  }
+
+  Future<void> _suspend(String email) async {
+    await context.read<ApiService>().suspendUser(email);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifier = Provider.of<AppThemeNotifier>(context);
     final t = notifier.current;
 
-    final pending  = _users.where((u) => u['status'] == 'pending').toList();
-    final approved = _users.where((u) => u['status'] == 'approved').toList();
-    final rejected = _users.where((u) => u['status'] == 'rejected').toList();
+    final pending   = _users.where((u) => u['status'] == 'pending').toList();
+    final approved  = _users.where((u) => u['status'] == 'approved').toList();
+    final suspended = _users.where((u) => u['status'] == 'suspended').toList();
+    final rejected  = _users.where((u) => u['status'] == 'rejected').toList();
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -109,6 +142,21 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       ),
                       ...approved.map((u) => _UserCard(
                         user: u, theme: t, accent: notifier.accent,
+                        onRevoke:  () => _revoke(u['email'] as String),
+                        onSuspend: () => _suspend(u['email'] as String),
+                      )),
+                      const SizedBox(height: 16),
+                    ],
+                    if (suspended.isNotEmpty) ...[
+                      _SectionHeader(
+                        label: 'Приостановленные',
+                        count: suspended.length,
+                        color: Colors.orangeAccent,
+                      ),
+                      ...suspended.map((u) => _UserCard(
+                        user: u, theme: t, accent: notifier.accent,
+                        onApprove: () => _approve(u['email'] as String),
+                        onReject:  () => _reject(u['email']  as String),
                       )),
                       const SizedBox(height: 16),
                     ],
@@ -183,12 +231,16 @@ class _UserCard extends StatelessWidget {
   final Color accent;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback? onRevoke;
+  final VoidCallback? onSuspend;
   const _UserCard({
     required this.user,
     required this.theme,
     required this.accent,
     this.onApprove,
     this.onReject,
+    this.onRevoke,
+    this.onSuspend,
   });
 
   @override
@@ -270,38 +322,58 @@ class _UserCard extends StatelessWidget {
               Text('Зарегистрирован: $dateStr',
                   style: TextStyle(color: theme.textSecondary, fontSize: 11)),
             ],
-            if (onApprove != null || onReject != null) ...[
+            if (onApprove != null || onReject != null || onRevoke != null || onSuspend != null) ...[
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   if (onApprove != null)
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: onApprove,
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('Одобрить'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.greenAccent.shade700,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
+                    ElevatedButton.icon(
+                      onPressed: onApprove,
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Одобрить'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent.shade700,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       ),
                     ),
-                  if (onApprove != null && onReject != null)
-                    const SizedBox(width: 10),
+                  if (onSuspend != null)
+                    OutlinedButton.icon(
+                      onPressed: onSuspend,
+                      icon: const Icon(Icons.pause_circle_outline, size: 16),
+                      label: const Text('Приостановить'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orangeAccent,
+                        side: const BorderSide(color: Colors.orangeAccent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
                   if (onReject != null)
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onReject,
-                        icon: const Icon(Icons.close, size: 16),
-                        label: const Text('Отклонить'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.redAccent,
-                          side: const BorderSide(color: Colors.redAccent),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
+                    OutlinedButton.icon(
+                      onPressed: onReject,
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Отклонить'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                  if (onRevoke != null)
+                    OutlinedButton.icon(
+                      onPressed: onRevoke,
+                      icon: const Icon(Icons.block, size: 16),
+                      label: const Text('Отозвать'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       ),
                     ),
                 ],
@@ -327,9 +399,10 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      'approved' => ('Одобрен',   Colors.greenAccent),
-      'rejected' => ('Отклонён',  Colors.redAccent),
-      _          => ('Ожидает',   Colors.amber),
+      'approved'  => ('Одобрен',          Colors.greenAccent),
+      'rejected'  => ('Отклонён',         Colors.redAccent),
+      'suspended' => ('Приостановлен',    Colors.orangeAccent),
+      _           => ('Ожидает',          Colors.amber),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

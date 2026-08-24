@@ -28,18 +28,93 @@ class GlassCard extends StatelessWidget {
 
     if (t.isLiquidGlass || t.glassy) {
       final blur = notifier.glassBlur;
-      content = ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      content = Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
-            padding: padding ?? const EdgeInsets.all(16),
-            child: child,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: Stack(
+            children: [
+              // Blur + gradient fill (Positioned — fills size set by the non-positioned child below)
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: t.isLight ? 0.52 : 0.18),
+                          Colors.white.withValues(alpha: t.isLight ? 0.28 : 0.08),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Left edge highlight
+              Positioned(
+                left: 0, top: 0, bottom: 0,
+                child: Container(
+                  width: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.white.withValues(alpha: t.isLight ? 0.55 : 0.30),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Top edge highlight
+              Positioned(
+                left: 0, top: 0, right: 0,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: t.isLight ? 0.45 : 0.22),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Border overlay
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: t.isLight ? 0.55 : 0.25),
+                        width: 0.8,
+                      ),
+                      borderRadius: BorderRadius.circular(radius),
+                    ),
+                  ),
+                ),
+              ),
+              // Non-positioned content: determines Stack height, transparent so blur shows through
+              Padding(
+                padding: padding ?? const EdgeInsets.all(16),
+                child: child,
+              ),
+            ],
           ),
         ),
       );

@@ -3,11 +3,47 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/vpn_config.dart';
 import '../providers/vpn_provider.dart';
+import '../services/nav_bar_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_surface.dart';
 
-class VpnConfigsScreen extends StatelessWidget {
+class VpnConfigsScreen extends StatefulWidget {
   const VpnConfigsScreen({super.key});
+
+  @override
+  State<VpnConfigsScreen> createState() => _VpnConfigsScreenState();
+}
+
+class _VpnConfigsScreenState extends State<VpnConfigsScreen> {
+  NavBarController? _navCtrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _navCtrl = context.read<NavBarController>();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navCtrl!.enterVpnConfigs(onAdd: _onAdd);
+    });
+  }
+
+  @override
+  void dispose() {
+    _navCtrl?.exitVpnConfigs();
+    super.dispose();
+  }
+
+  void _onAdd() {
+    if (!mounted) return;
+    final vpn = context.read<VpnProvider>();
+    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    _showAddConfigSheet(vpn, t);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,110 +82,85 @@ class VpnConfigsScreen extends StatelessWidget {
           if (t.isLiquidGlass || t.glassy)
             Positioned.fill(
                 child: Container(color: Colors.black.withValues(alpha: 0.15))),
-          Column(
-            children: [
-              Expanded(
-                child: vpn.configs.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Нет конфигураций\nДобавьте профиль ниже',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: t.textSecondary, fontSize: 15, height: 1.6),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                        itemCount: vpn.configs.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (_, i) {
-                          final c = vpn.configs[i];
-                          final isActive = vpn.activeConfig?.id == c.id;
-                          final tile = ListTile(
-                            leading: Icon(
-                              isActive
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                              color: isActive ? const Color(0xFF7B2FF7) : t.textSecondary,
-                              size: 22,
-                            ),
-                            title: Text(c.name, style: TextStyle(
-                              color: t.textPrimary,
-                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                            )),
-                            subtitle: Text(c.shortEndpoint,
-                                style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                            trailing: c.isAmneziaWg
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF7B2FF7).withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('AWG', style: TextStyle(
-                                        color: Color(0xFF7B2FF7),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold)),
-                                  )
-                                : null,
-                            onTap: () => vpn.selectConfig(c),
-                            onLongPress: () => _confirmDelete(context, vpn, c, t),
-                          );
-
-                          if (t.isLiquidGlass || t.glassy) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.04),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.10)),
-                                  ),
-                                  child: tile,
-                                ),
+          vpn.configs.isEmpty
+              ? Center(
+                  child: Text(
+                    'Нет конфигураций\nНажмите + в панели навигации',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: t.textSecondary, fontSize: 15, height: 1.6),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
+                  itemCount: vpn.configs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) {
+                    final c = vpn.configs[i];
+                    final isActive = vpn.activeConfig?.id == c.id;
+                    final tile = ListTile(
+                      leading: Icon(
+                        isActive
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isActive ? const Color(0xFF7B2FF7) : t.textSecondary,
+                        size: 22,
+                      ),
+                      title: Text(c.name, style: TextStyle(
+                        color: t.textPrimary,
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      )),
+                      subtitle: Text(c.shortEndpoint,
+                          style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                      trailing: c.isAmneziaWg
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7B2FF7).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
                               ),
-                            );
-                          }
-                          return Container(
+                              child: const Text('AWG', style: TextStyle(
+                                  color: Color(0xFF7B2FF7),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold)),
+                            )
+                          : null,
+                      onTap: () => vpn.selectConfig(c),
+                      onLongPress: () => _confirmDelete(vpn, c, t),
+                    );
+
+                    if (t.isLiquidGlass || t.glassy) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                          child: Container(
                             decoration: BoxDecoration(
-                              color: t.surface,
+                              color: Colors.white.withValues(alpha: 0.04),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: t.cardBorder),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.10)),
                             ),
                             child: tile,
-                          );
-                        },
+                          ),
+                        ),
+                      );
+                    }
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: t.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: t.cardBorder),
                       ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                    16, 8, 16, 16 + MediaQuery.paddingOf(context).bottom),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Добавить конфигурацию'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7B2FF7),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => _showAddConfigSheet(context, vpn, t),
-                  ),
+                      child: tile,
+                    );
+                  },
                 ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  void _showAddConfigSheet(BuildContext context, VpnProvider vpn, ThemeDef t) {
+  void _showAddConfigSheet(VpnProvider vpn, ThemeDef t) {
     final ctrl = TextEditingController();
     final nameCtrl = TextEditingController();
 
@@ -229,7 +240,7 @@ class VpnConfigsScreen extends StatelessWidget {
                     final name = nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim();
                     final ok = vpn.addConfigFromText(ctrl.text, name: name);
                     Navigator.pop(ctx);
-                    if (!ok) {
+                    if (!ok && mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Неверный формат конфигурации')),
                       );
@@ -264,7 +275,7 @@ class VpnConfigsScreen extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, VpnProvider vpn, VpnConfig c, ThemeDef t) {
+  void _confirmDelete(VpnProvider vpn, VpnConfig c, ThemeDef t) {
     showDialog<void>(
       context: context,
       builder: (dCtx) => AlertDialog(

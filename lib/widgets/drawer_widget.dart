@@ -13,6 +13,7 @@ import '../screens/bug_report_screen.dart';
 import '../screens/traffic_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/cameras_screen.dart';
+import '../screens/car_screen.dart';
 import 'circular_avatar.dart';
 
 class DrawerWidget extends StatefulWidget {
@@ -100,6 +101,10 @@ class _DrawerWidgetState extends State<DrawerWidget> {
             _item(Icons.videocam_outlined, 'Камеры', t, a, () {
               Navigator.pop(context);
               _push(context, const CamerasScreen());
+            }),
+            _item(Icons.directions_car_outlined, 'Машина', t, a, () {
+              Navigator.pop(context);
+              _push(context, const CarScreen());
             }),
             _item(Icons.settings_outlined, 'Настройки', t, a, () {
               Navigator.pop(context); _push(context, const SettingsScreen());

@@ -9,7 +9,6 @@ import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../widgets/aurora_ring.dart';
 import '../widgets/glitch_wrapper.dart';
-import '../widgets/pixel_disintegration_wrapper.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
 import '../widgets/circular_avatar.dart';
@@ -208,14 +207,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = context.read<PrefsService>();
 
     return Scaffold(
-      backgroundColor: t.bg,
+      backgroundColor: notifier.bgDecoration != null ? Colors.transparent : t.bg,
       appBar: AppBar(
         backgroundColor: t.nav,
         title: Text('Профиль', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: GlassBg(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 96 + MediaQuery.of(context).padding.bottom),
         child: Column(
           children: [
             const SizedBox(height: 16),
@@ -325,7 +324,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         for (final e in [
                           ('aurora',         'Аврора'),
                           ('glitch',         'Глитч'),
-                          ('disintegration', 'Пиксели'),
                           ('none',           'Нет'),
                         ])
                           GestureDetector(
@@ -375,7 +373,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               frequency: prefs.glitchFrequency,
                               child: avatar),
                           'none'           => avatar,
-                          'disintegration' => const PixelDisintegrationWrapper(child: avatar),
                           _                => const AuroraRing(ringPadding: 3, innerPadding: 3, child: avatar),
                         };
                       }(),
@@ -488,25 +485,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ],
 
-            const SizedBox(height: 12),
-            // Друзья
-            if (prefs.googleSignedIn && prefs.googleEmail.isNotEmpty)
-              GlassCard(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const FriendsScreen())),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Icon(Icons.people_outline, color: notifier.accent),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Друзья',
-                        style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w600)),
-                    ),
-                    Icon(Icons.chevron_right, color: t.textSecondary),
-                  ],
-                ),
-              ),
             const SizedBox(height: 12),
             // Google Sign-In
             GlassCard(

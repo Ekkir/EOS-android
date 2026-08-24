@@ -9,14 +9,19 @@ import 'package:workmanager/workmanager.dart';
 
 import 'theme/app_theme.dart';
 import 'services/download_state.dart';
+import 'services/nav_bar_controller.dart';
 import 'services/prefs_service.dart';
 import 'services/api_service.dart';
 import 'services/update_service.dart';
+import 'services/music_player_notifier.dart';
+import 'services/music_audio_handler.dart';
+import 'services/playlists_notifier.dart';
 import 'providers/vpn_provider.dart';
 import 'widgets/download_ring.dart';
 import 'widgets/glass_surface.dart';
-import 'screens/home_screen.dart';
+import 'widgets/global_nav_overlay.dart';
 import 'screens/splash_screen.dart';
+import 'screens/pin_lock_screen.dart';
 
 final FlutterLocalNotificationsPlugin localNotifPlugin = FlutterLocalNotificationsPlugin();
 
@@ -182,6 +187,9 @@ Future<void> main() async {
     );
   } catch (_) {}
 
+  // Удалить кэшированные APK обновлений с прошлого запуска
+  UpdateService.clearAllCache();
+
   final prefs = PrefsService();
   await prefs.init();
 
@@ -197,6 +205,14 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: prefs),
         ChangeNotifierProvider(create: (_) => DownloadState()),
         ChangeNotifierProvider(create: (_) => VpnProvider()),
+        ChangeNotifierProvider(create: (_) => NavBarController()),
+        Provider<MusicAudioHandler>(create: (_) => MusicAudioHandler()),
+        ChangeNotifierProvider(create: (_) => MusicPlayerNotifier()),
+        ChangeNotifierProvider(create: (_) {
+          final n = PlaylistsNotifier();
+          n.init();
+          return n;
+        }),
         ProxyProvider<PrefsService, ApiService>(
           update: (_, p, _) => ApiService(p),
         ),
@@ -222,45 +238,85 @@ void _registerFcmToken(PrefsService prefs) async {
   } catch (_) {}
 }
 
-class EosApp extends StatelessWidget {
+class EosApp extends StatefulWidget {
   const EosApp({super.key});
+
+  @override
+  State<EosApp> createState() => _EosAppState();
+}
+
+class _EosAppState extends State<EosApp> with WidgetsBindingObserver {
+  bool _wasInBackground = false;
+  bool _locked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasInBackground = true;
+    } else if (state == AppLifecycleState.resumed && _wasInBackground) {
+      _wasInBackground = false;
+      final prefs = context.read<PrefsService>();
+      if (prefs.securityEnabled && prefs.pinCode.isNotEmpty) {
+        setState(() => _locked = true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final themeNotifier = Provider.of<AppThemeNotifier>(context);
     final t = themeNotifier.current;
 
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    final iconBrightness = t.isLight ? Brightness.dark : Brightness.light;
+    final barBrightness  = t.isLight ? Brightness.light : Brightness.dark;
+    final overlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
+      statusBarIconBrightness: iconBrightness,
+      statusBarBrightness: barBrightness,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: iconBrightness,
       systemNavigationBarContrastEnforced: false,
-    ));
+    );
+    SystemChrome.setSystemUIOverlayStyle(overlayStyle);
+
+    final colorScheme = t.isLight
+        ? ColorScheme.light(
+            surface:   t.bg,
+            primary:   themeNotifier.accent,
+            secondary: themeNotifier.accent,
+          )
+        : ColorScheme.dark(
+            surface:   t.bg,
+            primary:   themeNotifier.accent,
+            secondary: themeNotifier.accent,
+          );
+
+    final navController = context.read<NavBarController>();
 
     return MaterialApp(
+      navigatorKey: navController.navigatorKey,
+      navigatorObservers: [navController.routeObserver],
       title: 'EOS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.dark(
-          surface:   t.bg,
-          primary:   themeNotifier.accent,
-          secondary: themeNotifier.accent,
-        ),
+        colorScheme: colorScheme,
         scaffoldBackgroundColor: t.bg,
         fontFamily: 'Roboto',
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-            systemNavigationBarColor: Colors.transparent,
-            systemNavigationBarIconBrightness: Brightness.light,
-            systemNavigationBarContrastEnforced: false,
-          ),
-        ),
+        appBarTheme: AppBarTheme(systemOverlayStyle: overlayStyle),
       ),
       builder: (context, child) {
         final notifier = Provider.of<AppThemeNotifier>(context);
@@ -270,6 +326,14 @@ class EosApp extends StatelessWidget {
             if (notifier.current.cyberpunk && !notifier.suppressScanlines)
               const Positioned.fill(child: CyberpunkScanlines()),
             const DownloadRingOverlay(),
+            const GlobalNavOverlay(),
+            const MusicFloatButton(),
+            if (_locked)
+              Positioned.fill(
+                child: PinLockScreen(
+                  onUnlocked: () => setState(() => _locked = false),
+                ),
+              ),
           ],
         );
       },

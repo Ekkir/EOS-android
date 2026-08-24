@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
@@ -17,10 +19,17 @@ class _ThemesScreenState extends State<ThemesScreen> {
   String? _hexError;
   String? _hex2Error;
 
+  final _bgHex1Ctrl = TextEditingController();
+  final _bgHex2Ctrl = TextEditingController();
+  String? _bgHex1Error;
+  String? _bgHex2Error;
+
   @override
   void dispose() {
     _hexCtrl.dispose();
     _hex2Ctrl.dispose();
+    _bgHex1Ctrl.dispose();
+    _bgHex2Ctrl.dispose();
     super.dispose();
   }
 
@@ -44,6 +53,36 @@ class _ThemesScreenState extends State<ThemesScreen> {
     } catch (_) { setState(() => _hex2Error = 'Неверный HEX'); }
   }
 
+  void _applyBgHex1(AppThemeNotifier notifier) {
+    final hex = _bgHex1Ctrl.text.trim().replaceFirst('#', '');
+    if (hex.length != 6) { setState(() => _bgHex1Error = 'Введите 6 символов HEX'); return; }
+    try {
+      final color = Color(int.parse('FF$hex', radix: 16));
+      setState(() => _bgHex1Error = null);
+      notifier.setBg(notifier.bgType, c1: color);
+    } catch (_) { setState(() => _bgHex1Error = 'Неверный HEX'); }
+  }
+
+  void _applyBgHex2(AppThemeNotifier notifier) {
+    final hex = _bgHex2Ctrl.text.trim().replaceFirst('#', '');
+    if (hex.length != 6) { setState(() => _bgHex2Error = 'Введите 6 символов HEX'); return; }
+    try {
+      final color = Color(int.parse('FF$hex', radix: 16));
+      setState(() => _bgHex2Error = null);
+      notifier.setBg(notifier.bgType, c2: color);
+    } catch (_) { setState(() => _bgHex2Error = 'Неверный HEX'); }
+  }
+
+  Future<void> _pickBgImage(AppThemeNotifier notifier) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      await notifier.setBg(AppBgType.image, imagePath: result.files.single.path);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifier = Provider.of<AppThemeNotifier>(context);
@@ -57,7 +96,7 @@ class _ThemesScreenState extends State<ThemesScreen> {
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
       body: GlassBg(child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 100),
         children: [
           Text('Тема оформления',
             style: TextStyle(color: t.textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
@@ -404,10 +443,246 @@ class _ThemesScreenState extends State<ThemesScreen> {
               ],
             ),
           ),
+          // ── Фон приложения ──────────────────────────────────────────────
+          const SizedBox(height: 24),
+          Text('Фон приложения',
+            style: TextStyle(color: t.textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+          const SizedBox(height: 10),
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Selector row
+                Row(
+                  children: [
+                    for (final entry in [
+                      (AppBgType.none,     'Нет'),
+                      (AppBgType.color,    'Цвет'),
+                      (AppBgType.gradient, 'Градиент'),
+                      (AppBgType.image,    'Изображение'),
+                    ]) ...[
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => notifier.setBg(entry.$1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: notifier.bgType == entry.$1
+                                  ? notifier.accent.withValues(alpha: 0.25)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: notifier.bgType == entry.$1
+                                    ? notifier.accent
+                                    : t.cardBorder,
+                                width: notifier.bgType == entry.$1 ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              entry.$2,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: notifier.bgType == entry.$1
+                                    ? notifier.accent
+                                    : t.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (notifier.bgType == AppBgType.color) ...[
+                  const SizedBox(height: 16),
+                  Text('Цвет фона', style: TextStyle(color: t.textPrimary, fontSize: 14)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10, runSpacing: 10,
+                    children: _bgColors.map((color) {
+                      final isActive = notifier.bgColor1.toARGB32() == color.toARGB32();
+                      return GestureDetector(
+                        onTap: () => notifier.setBg(AppBgType.color, c1: color),
+                        child: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isActive ? Border.all(color: Colors.white, width: 3) : null,
+                            boxShadow: isActive ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)] : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Text('#', style: TextStyle(color: t.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(
+                      controller: _bgHex1Ctrl,
+                      style: TextStyle(color: t.textPrimary, fontSize: 15),
+                      maxLength: 6, textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: 'RRGGBB', hintStyle: TextStyle(color: t.textSecondary),
+                        counterText: '', errorText: _bgHex1Error,
+                        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
+                      ),
+                      onSubmitted: (_) => _applyBgHex1(notifier),
+                    )),
+                    const SizedBox(width: 10),
+                    TextButton(
+                      onPressed: () => _applyBgHex1(notifier),
+                      style: TextButton.styleFrom(foregroundColor: notifier.accent),
+                      child: const Text('OK'),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  // Preview
+                  Container(
+                    height: 60, width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: notifier.bgColor1,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: t.cardBorder),
+                    ),
+                  ),
+                ],
+                if (notifier.bgType == AppBgType.gradient) ...[
+                  const SizedBox(height: 16),
+                  Text('Цвет 1', style: TextStyle(color: t.textPrimary, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: _bgColors.map((color) {
+                      final isActive = notifier.bgColor1.toARGB32() == color.toARGB32();
+                      return GestureDetector(
+                        onTap: () => notifier.setBg(AppBgType.gradient, c1: color),
+                        child: Container(
+                          width: 30, height: 30,
+                          decoration: BoxDecoration(
+                            color: color, shape: BoxShape.circle,
+                            border: isActive ? Border.all(color: Colors.white, width: 2) : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  Row(children: [
+                    Text('#', style: TextStyle(color: t.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(
+                      controller: _bgHex1Ctrl, style: TextStyle(color: t.textPrimary, fontSize: 15),
+                      maxLength: 6, textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: 'RRGGBB', hintStyle: TextStyle(color: t.textSecondary),
+                        counterText: '', errorText: _bgHex1Error,
+                        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
+                      ),
+                      onSubmitted: (_) => _applyBgHex1(notifier),
+                    )),
+                    TextButton(onPressed: () => _applyBgHex1(notifier),
+                      style: TextButton.styleFrom(foregroundColor: notifier.accent),
+                      child: const Text('OK')),
+                  ]),
+                  const SizedBox(height: 12),
+                  Text('Цвет 2', style: TextStyle(color: t.textPrimary, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: _bgColors.map((color) {
+                      final isActive = notifier.bgColor2.toARGB32() == color.toARGB32();
+                      return GestureDetector(
+                        onTap: () => notifier.setBg(AppBgType.gradient, c2: color),
+                        child: Container(
+                          width: 30, height: 30,
+                          decoration: BoxDecoration(
+                            color: color, shape: BoxShape.circle,
+                            border: isActive ? Border.all(color: Colors.white, width: 2) : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  Row(children: [
+                    Text('#', style: TextStyle(color: t.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(
+                      controller: _bgHex2Ctrl, style: TextStyle(color: t.textPrimary, fontSize: 15),
+                      maxLength: 6, textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: 'RRGGBB', hintStyle: TextStyle(color: t.textSecondary),
+                        counterText: '', errorText: _bgHex2Error,
+                        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.cardBorder)),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: notifier.accent)),
+                      ),
+                      onSubmitted: (_) => _applyBgHex2(notifier),
+                    )),
+                    TextButton(onPressed: () => _applyBgHex2(notifier),
+                      style: TextButton.styleFrom(foregroundColor: notifier.accent),
+                      child: const Text('OK')),
+                  ]),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 60, width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        colors: [notifier.bgColor1, notifier.bgColor2],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: t.cardBorder),
+                    ),
+                  ),
+                ],
+                if (notifier.bgType == AppBgType.image) ...[
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _pickBgImage(notifier),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: notifier.accent.withValues(alpha: 0.2),
+                      foregroundColor: notifier.accent,
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                    label: const Text('Выбрать изображение'),
+                  ),
+                  if (notifier.bgImagePath != null) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(notifier.bgImagePath!),
+                        height: 100, width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
         ],
       )),
     );
   }
+
+  static const _bgColors = [
+    Colors.black, Color(0xFF0D0D20), Color(0xFF050510), Color(0xFF1A0030),
+    Color(0xFF0A1628), Color(0xFF002020), Color(0xFF1A1A1A), Color(0xFF2D1B69),
+    Color(0xFF1B0000), Color(0xFF0D1F0D), Color(0xFF1C1A00), Color(0xFF001A2E),
+    Color(0xFF2C0A2C), Color(0xFF001A1A), Color(0xFF1A0A00), Color(0xFF0A001A),
+  ];
 
   static const _accentColors = [
     Color(0xFF00E5FF), Color(0xFF3C78FF), Color(0xFF76FF03), Color(0xFF39FF14),

@@ -5,7 +5,6 @@ import '../services/prefs_service.dart';
 import 'circular_avatar.dart';
 import 'aurora_ring.dart';
 import 'glitch_wrapper.dart';
-import 'pixel_disintegration_wrapper.dart';
 
 /// Centralized admin avatar widget that reacts to effect changes from PrefsService.
 /// Pass [isAdminAvatar] = true when displaying the admin's avatar to apply the effect.
@@ -40,9 +39,6 @@ class AdminAvatarWidget extends StatelessWidget {
           frequency: prefs.glitchFrequency,
           child: avatar),
       'none'           => avatar,
-      'disintegration' => PixelDisintegrationWrapper(
-          speed: prefs.disintSpeed,
-          child: avatar),
       _                => AuroraRing(
           ringPadding: 2,
           innerPadding: 2,

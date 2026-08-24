@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+enum AppBgType { none, color, gradient, image }
 
 class ThemeDef {
   final String id;
@@ -16,6 +19,7 @@ class ThemeDef {
   final bool isLiquidGlass;
   final bool neonGlow;
   final bool cyberpunk;
+  final bool isLight;
 
   const ThemeDef({
     required this.id,
@@ -32,6 +36,7 @@ class ThemeDef {
     this.isLiquidGlass = false,
     this.neonGlow = false,
     this.cyberpunk = false,
+    this.isLight = false,
   }) : accent2 = accent2 ?? accent;
 }
 
@@ -77,6 +82,18 @@ class AppThemeNotifier extends ChangeNotifier {
       cardBorder: const Color(0x22FFFFFF),
     ),
     ThemeDef(
+      id: 'pixel',
+      name: 'Pixel',
+      bg:            const Color(0xFF141218),
+      surface:       const Color(0xFF211F26),
+      nav:           const Color(0xFF2B2930),
+      accent:        const Color(0xFFD0BCFF),
+      accent2:       const Color(0xFF9A82DB),
+      textPrimary:   const Color(0xFFE6E1E5),
+      textSecondary: const Color(0xFF938F99),
+      cardBorder:    const Color(0x443A3842),
+    ),
+    ThemeDef(
       id: 'cyberpunk',
       name: 'Cyberpunk',
       bg: const Color(0xFF050010),
@@ -99,6 +116,11 @@ class AppThemeNotifier extends ChangeNotifier {
   double _scanlineOpacity = 0.10;
   bool   _suppressScanlines = false;
 
+  AppBgType _bgType    = AppBgType.none;
+  Color _bgColor1      = Colors.black;
+  Color _bgColor2      = const Color(0xFF1A0030);
+  String? _bgImagePath;
+
   ThemeDef get current => _current;
   Color  get accent   => _customAccent  ?? _current.accent;
   Color  get accent2  => _customAccent2 ?? _current.accent2;
@@ -106,6 +128,32 @@ class AppThemeNotifier extends ChangeNotifier {
   double get glassBlur        => _glassBlur;
   double get scanlineOpacity  => _scanlineOpacity;
   bool   get suppressScanlines => _suppressScanlines;
+  AppBgType get bgType => _bgType;
+  Color get bgColor1 => _bgColor1;
+  Color get bgColor2 => _bgColor2;
+  String? get bgImagePath => _bgImagePath;
+
+  BoxDecoration? get bgDecoration {
+    switch (_bgType) {
+      case AppBgType.color:
+        return BoxDecoration(color: _bgColor1);
+      case AppBgType.gradient:
+        return BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: [_bgColor1, _bgColor2],
+          ),
+        );
+      case AppBgType.image:
+        if (_bgImagePath == null) return null;
+        return BoxDecoration(
+          image: DecorationImage(
+            image: FileImage(File(_bgImagePath!)), fit: BoxFit.cover),
+        );
+      case AppBgType.none:
+        return null;
+    }
+  }
 
   static String _toHex(Color c) =>
       '#${c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
@@ -124,6 +172,10 @@ class AppThemeNotifier extends ChangeNotifier {
     _glowIntensity   = prefs.getDouble('glow_intensity')    ?? 1.0;
     _glassBlur       = prefs.getDouble('glass_blur')        ?? 6.0;
     _scanlineOpacity = prefs.getDouble('scanline_opacity')  ?? 0.10;
+    _bgType     = AppBgType.values[prefs.getInt('app_bg_type') ?? 0];
+    _bgColor1   = Color(prefs.getInt('app_bg_color1') ?? Colors.black.toARGB32());
+    _bgColor2   = Color(prefs.getInt('app_bg_color2') ?? const Color(0xFF1A0030).toARGB32());
+    _bgImagePath = prefs.getString('app_bg_image');
     notifyListeners();
   }
 
@@ -166,6 +218,19 @@ class AppThemeNotifier extends ChangeNotifier {
   void setSuppressScanlines(bool v) {
     if (_suppressScanlines == v) return;
     _suppressScanlines = v;
+    notifyListeners();
+  }
+
+  Future<void> setBg(AppBgType type, {Color? c1, Color? c2, String? imagePath}) async {
+    _bgType = type;
+    if (c1 != null) _bgColor1 = c1;
+    if (c2 != null) _bgColor2 = c2;
+    if (imagePath != null) _bgImagePath = imagePath;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('app_bg_type', type.index);
+    await prefs.setInt('app_bg_color1', _bgColor1.toARGB32());
+    await prefs.setInt('app_bg_color2', _bgColor2.toARGB32());
+    if (_bgImagePath != null) await prefs.setString('app_bg_image', _bgImagePath!);
     notifyListeners();
   }
 }

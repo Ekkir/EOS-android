@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +7,6 @@ import '../services/api_service.dart';
 import '../services/download_state.dart';
 import '../services/prefs_service.dart';
 import '../services/update_service.dart';
-import '../widgets/admin_avatar_widget.dart';
 import '../widgets/drawer_widget.dart';
 import '../widgets/glass_surface.dart';
 import '../widgets/glitch_wrapper.dart';
@@ -19,6 +17,8 @@ import 'settings_screen.dart';
 import 'cameras_screen.dart';
 import 'chat_list_screen.dart';
 import 'vpn_screen.dart';
+import 'car_screen.dart';
+import 'music_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,38 +28,32 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  Uint8List? _avatarBytes;
   int _unreadCount = 0;
-  Timer? _unreadTimer;
+  AppThemeNotifier? _themeNotifier;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadAvatar();
       _checkUpdate();
       _pingServer();
-      _fetchUnread();
-    });
-    _unreadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) _fetchUnread();
     });
   }
 
   @override
-  void dispose() {
-    _unreadTimer?.cancel();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _themeNotifier?.removeListener(_onTheme);
+    _themeNotifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    _themeNotifier!.addListener(_onTheme);
   }
 
-  Future<void> _fetchUnread() async {
-    final api = context.read<ApiService>();
-    final prefs = context.read<PrefsService>();
-    final myName = prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleName;
-    final channels = await api.getChannels(myName: myName);
-    if (!mounted) return;
-    final count = channels.where((ch) => ch.lastMessageId > prefs.getLastReadId(ch.id)).length;
-    if (count != _unreadCount) setState(() => _unreadCount = count);
+  void _onTheme() { if (mounted) setState(() {}); }
+
+  @override
+  void dispose() {
+    _themeNotifier?.removeListener(_onTheme);
+    super.dispose();
   }
 
   Future<void> _pingServer() async {
@@ -79,23 +73,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadAvatar() async {
-    final prefs = context.read<PrefsService>();
-    final api = context.read<ApiService>();
-
-    List<int>? bytes;
-    if (prefs.googleSignedIn && prefs.googleEmail.isNotEmpty) {
-      bytes = await api.getAvatarByEmail(prefs.googleEmail);
-    } else if (prefs.profileName.isNotEmpty) {
-      bytes = await api.getAvatarByName(prefs.profileName);
-    }
-    if (bytes != null && mounted) {
-      setState(() => _avatarBytes = Uint8List.fromList(bytes!));
-    }
-  }
-
   Future<void> _checkUpdate() async {
-    final info = await UpdateService.fetchReleaseInfo();
+    final info = await UpdateService.fetchReleaseInfo(prefs: context.read<PrefsService>());
     if (!mounted || info == null) return;
     final version = info['version'];
     if (version == null) return;
@@ -134,109 +113,82 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: scrollCtrl,
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: t.cardBorder,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+                Center(child: Container(width: 40, height: 4,
+                    decoration: BoxDecoration(color: t.cardBorder,
+                        borderRadius: BorderRadius.circular(2)))),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.system_update, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text('Доступна версия $version',
+                Row(children: [
+                  const Icon(Icons.system_update, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Text('Доступна версия $version',
                       style: const TextStyle(color: Colors.green,
                           fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
-                ),
+                ]),
                 if (notes != null && notes.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Text(
-                    notes,
-                    style: TextStyle(color: t.textSecondary, fontSize: 13, height: 1.5),
-                  ),
+                  Text(notes, style: TextStyle(color: t.textSecondary, fontSize: 13, height: 1.5)),
                 ],
                 const SizedBox(height: 20),
                 if (downloading)
-                  Column(
-                    children: [
-                      GradientProgressBar(
-                        value: progress,
-                        height: 6,
-                        background: t.cardBorder,
-                      ),
-                      const SizedBox(height: 6),
-                      Text('${(progress * 100).toInt()}%',
+                  Column(children: [
+                    GradientProgressBar(value: progress, height: 6, background: t.cardBorder),
+                    const SizedBox(height: 6),
+                    Text('${(progress * 100).toInt()}%',
                         style: TextStyle(color: t.textSecondary, fontSize: 13)),
-                    ],
-                  )
+                  ])
                 else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: apkUrl == null ? null : () async {
-                            final cached = await UpdateService.getCachedApk(version);
-                            if (cached != null) {
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              final err = await UpdateService.installApk(cached);
-                              if (err != null && context.mounted) {
-                                UpdateService.handleInstallError(context, err);
-                              }
-                              return;
-                            }
-                            setLocal(() => downloading = true);
-                            final dlState = context.read<DownloadState>();
-                            dlState.startDownload();
-                            final path = await UpdateService.downloadApk(apkUrl, version, (p, r, tt) {
-                              try { setLocal(() => progress = p); } catch (_) {}
-                              dlState.onProgress(p, r, tt);
-                            });
+                  Row(children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: apkUrl == null ? null : () async {
+                          final cached = await UpdateService.getCachedApk(version);
+                          if (cached != null) {
                             if (ctx.mounted) Navigator.pop(ctx);
-                            dlState.complete(path);
-                            if (path != null) {
-                              final err = await UpdateService.installApk(path);
-                              if (err != null && context.mounted) {
-                                UpdateService.handleInstallError(context, err);
-                              }
-                            } else if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Загрузка прервана. Проверьте соединение и попробуйте снова.'),
-                                  duration: Duration(seconds: 4),
-                                ),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.download),
-                          label: const Text('Скачать и установить'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
+                            final err = await UpdateService.installApk(cached);
+                            if (err != null && context.mounted) UpdateService.handleInstallError(context, err);
+                            return;
+                          }
+                          setLocal(() => downloading = true);
+                          final dlState = context.read<DownloadState>();
+                          dlState.startDownload();
+                          final path = await UpdateService.downloadApk(apkUrl, version, (p, r, tt) {
+                            try { setLocal(() => progress = p); } catch (_) {}
+                            dlState.onProgress(p, r, tt);
+                          });
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          dlState.complete(path);
+                          if (path != null) {
+                            final err = await UpdateService.installApk(path);
+                            if (err != null && context.mounted) UpdateService.handleInstallError(context, err);
+                          } else if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text('Загрузка прервана. Проверьте соединение и попробуйте снова.'),
+                              duration: Duration(seconds: 4),
+                            ));
+                          }
+                        },
+                        icon: const Icon(Icons.download),
+                        label: const Text('Скачать и установить'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: t.textSecondary,
-                          side: BorderSide(color: t.cardBorder),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Позже'),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: t.textSecondary,
+                        side: BorderSide(color: t.cardBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                    ],
-                  ),
+                      child: const Text('Позже'),
+                    ),
+                  ]),
               ],
             ),
           ),
@@ -251,33 +203,39 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = notifier.current;
     final a = notifier.accent;
 
-    final sections = [
-      _Section(Icons.traffic_outlined, 'Светофоры', 'Управление трафиком', 0, () =>
-          _push(context, const TrafficScreen())),
-      _Section(Icons.map_outlined, 'Карта', 'Перекрёстки на карте', 0, () =>
-          _push(context, const MapScreen())),
-      _Section(Icons.videocam_outlined, 'Камеры', 'Видеонаблюдение', 0, () =>
-          _push(context, const CamerasScreen())),
-      _Section(Icons.chat_bubble_outline, 'Чаты', 'Сообщения и каналы', _unreadCount, () async {
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatListScreen()));
-        _fetchUnread();
-      }),
-      _Section(Icons.vpn_lock_outlined, 'VPN', 'AmneziaWG защита трафика', 0, () =>
-          _push(context, const VpnScreen())),
-      _Section(Icons.settings_outlined, 'Настройки', 'Конфигурация системы', 0, () =>
-          _push(context, const SettingsScreen())),
-    ];
+    final prefs = context.watch<PrefsService>();
 
-    final prefs = context.read<PrefsService>();
+    _Section? _sectionForKey(String key) {
+      if (!prefs.isTileVisible(key)) return null;
+      switch (key) {
+        case 'traffic': return _Section(Icons.traffic_outlined, 'Светофоры', 'Управление трафиком', 0, () =>
+            _push(context, const TrafficScreen()));
+        case 'map': return _Section(Icons.map_outlined, 'Карта', 'Перекрёстки на карте', 0, () =>
+            _push(context, const MapScreen()));
+        case 'cameras': return _Section(Icons.videocam_outlined, 'Камеры', 'Видеонаблюдение', 0, () =>
+            _push(context, const CamerasScreen()));
+        case 'chats': return _Section(Icons.chat_bubble_outline, 'Чаты', 'Сообщения и каналы', _unreadCount, () =>
+            _push(context, const ChatListScreen()));
+        case 'vpn': return _Section(Icons.vpn_lock_outlined, 'VPN', 'AmneziaWG защита трафика', 0, () =>
+            _push(context, const VpnScreen()));
+        case 'car': return _Section(Icons.directions_car_outlined, 'Машина', 'Управление транспортом', 0, () =>
+            _push(context, const CarScreen()));
+        case 'music': return _Section(Icons.music_note_outlined, 'Музыка', 'Треки с сервера', 0, () =>
+            _push(context, const MusicScreen()));
+        default: return null;
+      }
+    }
+
+    final sections = [
+      for (final key in prefs.tileOrder)
+        if (_sectionForKey(key) != null) _sectionForKey(key)!,
+    ];
     final displayName = prefs.googleName.isNotEmpty
         ? prefs.googleName
         : (prefs.profileName.isNotEmpty ? prefs.profileName : '?');
 
     return Scaffold(
-      backgroundColor: t.bg,
-      drawer: const DrawerWidget(),
-      drawerEnableOpenDragGesture: true,
-      drawerEdgeDragWidth: 60,
+      backgroundColor: notifier.bgDecoration != null ? Colors.transparent : t.bg,
       body: SafeArea(
         child: Stack(
           children: [
@@ -291,12 +249,24 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Builder(builder: (ctx) => _buildHeader(ctx, t, a, displayName)),
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: sections.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _buildCard(context, sections[i], t, a),
-                  ),
+                  child: prefs.squareTiles
+                      ? GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 1.0,
+                          ),
+                          itemCount: sections.length,
+                          itemBuilder: (_, i) => _buildSquareCard(context, sections[i], t, a),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                          itemCount: sections.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) => _buildCard(context, sections[i], t, a),
+                        ),
                 ),
               ],
             ),
@@ -311,41 +281,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       color: t.nav,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Scaffold.of(context).openDrawer(),
-            child: AdminAvatarWidget(
-              bytes: _avatarBytes,
-              name: name,
-              radius: 22,
-              isAdminAvatar: prefs.isAdmin,
-            ),
-          ),
-          Expanded(
-            child: Builder(builder: (ctx) {
-              Widget title = Column(
-                children: [
-                  Text('EOS', style: TextStyle(color: t.textPrimary,
-                      fontSize: 22, fontWeight: FontWeight.bold)),
-                  Text('SYSTEM', style: TextStyle(color: a, fontSize: 9,
-                      letterSpacing: 3, fontWeight: FontWeight.bold)),
-                ],
-              );
-              if (t.cyberpunk) {
-                title = GlitchWrapper(
-                  intensity: 0.9,
-                  frequency: 0.7,
-                  chromatic: true,
-                  child: title,
-                );
-              }
-              return title;
-            }),
-          ),
-          const SizedBox(width: 44),
-        ],
-      ),
+      child: Builder(builder: (ctx) {
+        Widget title = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('EOS', style: TextStyle(color: t.textPrimary,
+                fontSize: 22, fontWeight: FontWeight.bold)),
+            Text('SYSTEM', style: TextStyle(color: a, fontSize: 9,
+                letterSpacing: 3, fontWeight: FontWeight.bold)),
+          ],
+        );
+        if (t.cyberpunk) {
+          title = GlitchWrapper(
+            intensity: 0.9,
+            frequency: 0.7,
+            chromatic: true,
+            child: title,
+          );
+        }
+        return Center(child: title);
+      }),
     );
   }
 
@@ -468,6 +423,101 @@ class _HomeScreenState extends State<HomeScreen> {
           border: Border.all(color: t.cardBorder),
         ),
         child: rowContent,
+      );
+    }
+
+    return GestureDetector(onTap: s.onTap, child: card);
+  }
+
+  Widget _buildSquareCard(BuildContext context, _Section s, ThemeDef t, Color a) {
+    final notifier = Provider.of<AppThemeNotifier>(context, listen: false);
+    final a2 = notifier.accent2;
+
+    Widget iconBox = Container(
+      width: 52, height: 52,
+      decoration: BoxDecoration(
+        color: a.withValues(alpha: t.cyberpunk ? 0.12 : 0.15),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: t.cyberpunk
+            ? [BoxShadow(color: a.withValues(alpha: 0.35), blurRadius: 10)]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: Icon(s.icon, color: a, size: 26),
+    );
+
+    if (t.cyberpunk) {
+      iconBox = GlitchWrapper(intensity: 0.5, frequency: 0.5, chromatic: true, child: iconBox);
+    }
+
+    final content = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Stack(clipBehavior: Clip.none, children: [
+          iconBox,
+          if (s.badge > 0)
+            Positioned(
+              top: -4, right: -6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(color: a, borderRadius: BorderRadius.circular(10)),
+                child: Text(s.badge > 99 ? '99+' : '${s.badge}',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 10),
+        Text(s.title, style: TextStyle(color: t.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ],
+    );
+
+    Widget card;
+    if (t.isLiquidGlass || t.glassy) {
+      card = ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            ),
+            child: Center(child: Padding(padding: const EdgeInsets.all(12), child: content)),
+          ),
+        ),
+      );
+    } else if (t.cyberpunk) {
+      card = Container(
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: a.withValues(alpha: 0.5), width: 1),
+          boxShadow: [
+            BoxShadow(color: a.withValues(alpha: 0.20), blurRadius: 14),
+            BoxShadow(color: a2.withValues(alpha: 0.12), blurRadius: 24),
+          ],
+        ),
+        child: Center(child: Padding(padding: const EdgeInsets.all(12), child: content)),
+      );
+    } else if (t.neonGlow) {
+      card = Container(
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: a2.withValues(alpha: 0.55), width: 1),
+        ),
+        child: Center(child: Padding(padding: const EdgeInsets.all(12), child: content)),
+      );
+    } else {
+      card = Container(
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: t.cardBorder),
+        ),
+        child: Center(child: Padding(padding: const EdgeInsets.all(12), child: content)),
       );
     }
 

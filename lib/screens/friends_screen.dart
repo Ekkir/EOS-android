@@ -57,7 +57,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final t = notifier.current;
 
     return Scaffold(
-      backgroundColor: t.bg,
+      backgroundColor: notifier.bgDecoration != null ? Colors.transparent : t.bg,
       appBar: AppBar(
         backgroundColor: t.nav,
         title: Text('Друзья', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),

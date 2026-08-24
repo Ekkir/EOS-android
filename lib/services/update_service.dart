@@ -1,58 +1,112 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
+import 'prefs_service.dart';
+import 'server_url_resolver.dart';
+
+class UpdateLogger {
+  static final _entries = <String>[];
+
+  static void log(String msg) {
+    final t = DateTime.now().toLocal();
+    final ts = '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}:${t.second.toString().padLeft(2,'0')}';
+    _entries.add('[$ts] $msg');
+  }
+
+  static void clear() => _entries.clear();
+
+  static String get dump => _entries.join('\n');
+
+  static bool get hasEntries => _entries.isNotEmpty;
+}
 
 class UpdateService {
-  static const currentVersion = '1.1.95';
+  static const currentVersion = '1.2.19';
   static const _installerChannel = MethodChannel('com.traffic.app/installer');
   static const taskName = 'eos_update_check';
   static const notifChannelId = 'eos_updates';
   static const notifChannelName = 'Обновления';
-  static const _releasesApi =
+  static const _githubApi =
       'https://api.github.com/repos/Ekkir/EOS-android/releases/latest';
 
   // Returns {'version': 'v1.1.22', 'apk_url': '...', 'notes': '...'}
-  // apk_url is null if release has no APK asset
-  static Future<Map<String, String?>?> fetchReleaseInfo() async {
+  // Pass [prefs] to enable server-proxy (avoids GitHub rate limit).
+  static Future<Map<String, String?>?> fetchReleaseInfo({PrefsService? prefs}) async {
+    UpdateLogger.log('Проверка обновлений. Текущая версия: $currentVersion');
+
+    // Try backend proxy first (avoids GitHub rate limit)
+    if (prefs != null) {
+      final fromServer = await _fetchFromBackend(prefs);
+      if (fromServer != null) return fromServer;
+    }
+
+    // Fallback: direct GitHub
+    UpdateLogger.log('Резервный запрос напрямую к GitHub...');
+    UpdateLogger.log('URL: $_githubApi');
     try {
+      UpdateLogger.log('Отправка HTTP-запроса...');
       final resp = await http.get(
-        Uri.parse(_releasesApi),
-        headers: {
-          'User-Agent': 'EOS-App',
-          'Accept': 'application/vnd.github+json',
-        },
+        Uri.parse(_githubApi),
+        headers: {'User-Agent': 'EOS-App', 'Accept': 'application/vnd.github+json'},
       ).timeout(const Duration(seconds: 10));
 
-      if (resp.statusCode != 200) return null;
+      UpdateLogger.log('HTTP статус: ${resp.statusCode}');
+      if (resp.statusCode != 200) {
+        UpdateLogger.log('ОШИБКА: неожиданный статус ${resp.statusCode}');
+        UpdateLogger.log('Тело ответа: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
+        return null;
+      }
 
-      final body = resp.body;
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final version = json['tag_name'] as String?;
+      if (version == null) { UpdateLogger.log('ОШИБКА: поле tag_name отсутствует'); return null; }
+      UpdateLogger.log('Версия: $version');
 
-      final versionMatch = RegExp(r'"tag_name"\s*:\s*"([^"]+)"').firstMatch(body);
-      final version = versionMatch?.group(1);
-      if (version == null) return null;
-
-      // Find APK in assets array
       String? apkUrl;
-      final assetsMatch = RegExp(
-        r'"browser_download_url"\s*:\s*"([^"]+\.apk)"',
-      ).firstMatch(body);
-      if (assetsMatch != null) apkUrl = assetsMatch.group(1);
-
-      // Extract release notes (body field)
-      final notesMatch = RegExp(
-        r'"body"\s*:\s*"((?:[^"\\]|\\.)*)"',
-      ).firstMatch(body);
-      final notes = notesMatch?.group(1)
-          ?.replaceAll(r'\n', '\n')
-          .replaceAll(r'\r', '')
-          .replaceAll(r'\"', '"');
-
-      return {'version': version, 'apk_url': apkUrl, 'notes': notes};
-    } catch (_) {}
+      for (final asset in (json['assets'] as List? ?? [])) {
+        final url = (asset as Map)['browser_download_url'] as String?;
+        if (url != null && url.endsWith('.apk')) apkUrl = url;
+      }
+      UpdateLogger.log(apkUrl != null ? 'APK: $apkUrl' : 'APK не найден');
+      UpdateLogger.log('Готово (GitHub direct)');
+      return {'version': version, 'apk_url': apkUrl, 'notes': json['body'] as String?};
+    } on TimeoutException {
+      UpdateLogger.log('ОШИБКА: таймаут 10 сек');
+    } on SocketException catch (e) {
+      UpdateLogger.log('ОШИБКА сети: $e');
+    } catch (e) {
+      UpdateLogger.log('ОШИБКА: $e');
+    }
     return null;
+  }
+
+  static Future<Map<String, String?>?> _fetchFromBackend(PrefsService prefs) async {
+    try {
+      final serverUrl = await ServerUrlResolver.resolve(prefs);
+      if (serverUrl.isEmpty) { UpdateLogger.log('Сервер недоступен, пробуем GitHub'); return null; }
+      final url = '$serverUrl/latest_release';
+      UpdateLogger.log('URL (сервер): $url');
+      final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+      UpdateLogger.log('HTTP статус (сервер): ${resp.statusCode}');
+      if (resp.statusCode != 200) return null;
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      if (json.containsKey('error')) { UpdateLogger.log('Ошибка сервера: ${json['error']}'); return null; }
+      final version = json['version'] as String?;
+      if (version == null) return null;
+      UpdateLogger.log('Версия: $version');
+      final apkUrl = json['apk_url'] as String?;
+      UpdateLogger.log(apkUrl != null ? 'APK: $apkUrl' : 'APK не найден');
+      UpdateLogger.log('Готово (сервер-прокси)');
+      return {'version': version, 'apk_url': apkUrl, 'notes': json['notes'] as String?};
+    } catch (e) {
+      UpdateLogger.log('Прокси недоступен ($e), пробуем GitHub');
+      return null;
+    }
   }
 
   // Convenience method for background task (only version string)
@@ -173,6 +227,18 @@ class UpdateService {
         if (f is File &&
             f.path.contains('eos_update_') &&
             !f.path.contains(_apkFilename(keepVersion))) {
+          await f.delete();
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Deletes all cached update APKs — call on app startup
+  static Future<void> clearAllCache() async {
+    try {
+      final dir = Directory(await _cacheDir());
+      await for (final f in dir.list()) {
+        if (f is File && f.path.contains('eos_update_')) {
           await f.delete();
         }
       }

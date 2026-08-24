@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/device_id_service.dart';
 import '../services/download_state.dart';
+import '../services/prefs_service.dart';
 import '../services/update_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
@@ -67,18 +69,84 @@ class _AboutScreenState extends State<AboutScreen>
   }
 
   Future<void> _checkUpdate() async {
+    UpdateLogger.clear();
     setState(() { _checking = true; _updateAvailable = null; });
-    final info = await UpdateService.fetchReleaseInfo();
+    final info = await UpdateService.fetchReleaseInfo(prefs: context.read<PrefsService>());
     if (!mounted) return;
-    final version = info?['version'];
+
+    if (info == null) {
+      setState(() => _checking = false);
+      _showUpdateError();
+      return;
+    }
+
+    final version = info['version'];
     setState(() {
       _latestVersion = version;
-      _apkUrl = info?['apk_url'];
-      _releaseNotes = info?['notes'];
+      _apkUrl = info['apk_url'];
+      _releaseNotes = info['notes'];
       _updateAvailable = version != null &&
           UpdateService.isNewer(version, UpdateService.currentVersion);
       _checking = false;
     });
+  }
+
+  void _showUpdateError() {
+    if (!mounted) return;
+    final t = Provider.of<AppThemeNotifier>(context, listen: false).current;
+    final accent = Provider.of<AppThemeNotifier>(context, listen: false).accent;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        title: Text('Ошибка проверки обновлений',
+            style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Не удалось подключиться к серверу обновлений.\n\nОтправить лог ошибки администратору?',
+          style: TextStyle(color: t.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Отмена', style: TextStyle(color: t.textSecondary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _sendUpdateLog();
+            },
+            icon: const Icon(Icons.send, size: 16),
+            label: const Text('Отправить лог'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendUpdateLog() async {
+    if (!mounted) return;
+    final prefs  = context.read<PrefsService>();
+    final api    = context.read<ApiService>();
+    final device = await DeviceIdService.get();
+
+    final from = prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleEmail;
+    final text = '[UPDATE CHECK LOG — ${DateTime.now().toLocal()}]\n'
+        'Версия приложения: ${UpdateService.currentVersion}\n'
+        'Email: ${prefs.googleEmail}\n'
+        'Устройство: ${device.name} (${device.id})\n\n'
+        '${UpdateLogger.dump}';
+
+    final ok = await api.submitBugReport(from: from, device: device.name, text: text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Лог отправлен администратору' : 'Не удалось отправить лог'),
+      duration: const Duration(seconds: 3),
+    ));
   }
 
   Future<void> _downloadAndInstall() async {

@@ -692,4 +692,13 @@ class ApiService {
       return r.statusCode == 200;
     } catch (_) { return false; }
   }
+
+  Future<bool> suspendUser(String email) async {
+    try {
+      final r = await http.post(Uri.parse('${await _base}/admin/suspend'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email})).timeout(const Duration(seconds: 8));
+      return r.statusCode == 200;
+    } catch (_) { return false; }
+  }
 }

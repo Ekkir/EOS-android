@@ -6,6 +6,7 @@ import '../theme/app_theme.dart' show AppThemeNotifier, ThemeDef, NeonTextStyle;
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import '../models/channel.dart';
+import '../services/nav_bar_controller.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_surface.dart';
 import '../widgets/circular_avatar.dart';
@@ -19,23 +20,49 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen> with RouteAware {
   List<Channel> _channels = [];
   final Map<String, String> _dmDisplayNames = {};
   final Map<String, Uint8List?> _dmAvatarCache = {};
   Timer? _timer;
   bool _loading = true;
   String _searchQuery = '';
+  NavBarController? _navCtrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nc = context.read<NavBarController>();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) nc.routeObserver.subscribe(this, route);
+    _navCtrl = nc;
+  }
+
+  @override
+  void didPopNext() => _enterSection();
+
+  void _enterSection() {
+    _navCtrl?.enterChatList(
+      onSearch: (q) => setState(() => _searchQuery = q),
+      onAdd: _showNewDmDialog,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _fetch();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _fetch());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _enterSection();
+    });
   }
 
   @override
   void dispose() {
+    _navCtrl?.routeObserver.unsubscribe(this);
+    _navCtrl?.exitChatList();
     _timer?.cancel();
     super.dispose();
   }
@@ -112,7 +139,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         .where((c) => !c.isDm && c.displayName.toLowerCase().contains(q))
         .toList();
     final dmChannels = _channels
-        .where((c) => c.isDm && c.displayName.toLowerCase().contains(q))
+        .where((c) => c.isDm && (
+            c.displayName.toLowerCase().contains(q) ||
+            (_dmDisplayNames[c.id] ?? '').toLowerCase().contains(q)))
         .toList();
 
     return Scaffold(
@@ -122,41 +151,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         title: Text('Чаты', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: t.surface,
-        foregroundColor: notifier.accent,
-        onPressed: _showNewDmDialog,
-        tooltip: 'Написать сообщение',
-        child: const Icon(Icons.edit),
-      ),
       body: GlassBg(child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: TextField(
-              style: TextStyle(color: t.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Поиск...',
-                hintStyle: TextStyle(color: t.textSecondary),
-                prefixIcon: Icon(Icons.search, color: t.textSecondary, size: 20),
-                filled: true,
-                fillColor: t.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (v) => setState(() => _searchQuery = v.trim()),
-            ),
-          ),
           Expanded(
             child: _loading
                 ? Center(child: CircularProgressIndicator(color: notifier.accent))
                 : _channels.isEmpty
                     ? Center(child: Text('Нет каналов', style: TextStyle(color: t.textSecondary)))
                     : ListView(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
                         children: [
                           if (publicChannels.isNotEmpty) ...[
                             _SectionHeader(title: 'КАНАЛЫ', theme: t),

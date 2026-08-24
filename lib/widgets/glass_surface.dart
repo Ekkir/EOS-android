@@ -55,53 +55,112 @@ class GlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final fill = dark
-        ? Colors.white.withValues(alpha: 0.05)
-        : Colors.white.withValues(alpha: 0.50);
-    final highlight = dark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.white.withValues(alpha: 0.65);
-    final shade = dark
-        ? Colors.black.withValues(alpha: 0.25)
-        : Colors.black.withValues(alpha: 0.06);
+    final dark = !context.watch<AppThemeNotifier>().current.isLight;
     final clip = circle ? BorderRadius.circular(999) : borderRadius;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: clip,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: dark ? 0.38 : 0.60),
-            Colors.white.withValues(alpha: dark ? 0.06 : 0.12),
-          ],
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(0.7),
-        child: ClipRRect(
-          borderRadius: clip,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-            child: Container(
-              padding: padding,
-              decoration: BoxDecoration(
-                borderRadius: clip,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color.alphaBlend(highlight.withValues(alpha: 0.10), fill),
-                    fill,
-                    Color.alphaBlend(shade, fill),
-                  ],
+      child: ClipRRect(
+        borderRadius: clip,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: dark ? 0.18 : 0.52),
+                        Colors.white.withValues(alpha: dark ? 0.08 : 0.28),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              child: child,
             ),
-          ),
+            if (!circle) ...[
+              Positioned(
+                left: 0, top: 0, bottom: 0,
+                child: Container(
+                  width: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.white.withValues(alpha: dark ? 0.30 : 0.55),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0, top: 0, right: 0,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: dark ? 0.22 : 0.45),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              Positioned(
+                left: 0, top: 0, bottom: 0, right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.5, -0.5),
+                      radius: 1.0,
+                      colors: [
+                        Colors.white.withValues(alpha: dark ? 0.30 : 0.55),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            // Border overlay
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: clip,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: dark ? 0.25 : 0.55),
+                      width: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Non-positioned content: determines Stack size, transparent so blur shows through
+            if (padding != null)
+              Padding(padding: padding!, child: child)
+            else
+              child,
+          ],
         ),
       ),
     );

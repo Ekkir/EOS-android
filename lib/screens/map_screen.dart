@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/cached_tile_provider.dart';
+import '../services/nav_bar_controller.dart';
 import '../services/prefs_service.dart';
 import '../models/traffic_state.dart';
 import '../models/event.dart';
@@ -21,7 +25,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver, RouteAware {
   final _mapController = MapController();
   TrafficSnapshot? _snapshot;
   Timer? _timer;
@@ -35,6 +39,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _sharingInBackground = false;
   bool _pickingEventLocation = false;
   final Map<String, Uint8List?> _avatarCache = {};
+  CachedTileProvider? _tileProvider;
+  Map<String, LatLng> _crossroadPos = {};
+  String? _draggingMarkerId;
+  NavBarController? _navCtrl;
 
   static const _defaultCenter = LatLng(52.6526, 90.1021);
 
@@ -51,21 +59,79 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _fetchLocations();
     });
     _requestLocationPermission();
+    _initTileCache();
+    _loadCrossroadPositions();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreLocationSharing();
       if (mounted) context.read<AppThemeNotifier>().setSuppressScanlines(true);
+      if (mounted) _enterSection();
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nc = context.read<NavBarController>();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) nc.routeObserver.subscribe(this, route);
+    _navCtrl = nc;
+  }
+
+  @override
+  void didPopNext() => _enterSection();
+
+  void _enterSection() {
+    _navCtrl?.enterMap(
+      sharing: _sharingLocation,
+      hasLocation: _myLocation != null,
+      toggle: _toggleLocationSharing,
+      addEvent: () => setState(() => _pickingEventLocation = true),
+      center: () {
+        if (_myLocation != null) _mapController.move(_myLocation!, 15);
+      },
+    );
+  }
+
+  @override
   void dispose() {
+    _navCtrl?.routeObserver.unsubscribe(this);
     context.read<AppThemeNotifier>().setSuppressScanlines(false);
+    _navCtrl?.exitSection();
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _locationSub?.cancel();
     _locationShareTimer?.cancel();
     _mapController.dispose();
     super.dispose();
+  }
+
+  void _syncNavBar() {
+    _navCtrl?.updateMapState(
+      sharing: _sharingLocation,
+      hasLocation: _myLocation != null,
+    );
+  }
+
+  Future<void> _initTileCache() async {
+    try {
+      final base = await getApplicationCacheDirectory();
+      final dir = Directory('${base.path}/map_tiles');
+      await dir.create(recursive: true);
+      CachedTileProvider.cleanOldTiles(dir);
+      if (mounted) setState(() => _tileProvider = CachedTileProvider(cacheDir: dir));
+    } catch (_) {}
+  }
+
+  Future<void> _loadCrossroadPositions() async {
+    try {
+      final api = context.read<ApiService>();
+      final data = await api.getCrossroadPositions();
+      if (mounted && data.isNotEmpty) {
+        setState(() {
+          _crossroadPos = data.map((k, v) => MapEntry(k, LatLng(v[0], v[1])));
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -124,6 +190,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _locationSub = Geolocator.getPositionStream(locationSettings: settings).listen((pos) {
       if (!mounted) return;
       setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
+      _syncNavBar();
     });
   }
 
@@ -142,7 +209,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
     final name = prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleName;
     await api.updateLocation(email, pos.latitude, pos.longitude, name);
-    if (mounted) setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
+    if (mounted) {
+      setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
+      _syncNavBar();
+    }
   }
 
   Future<void> _restoreLocationSharing() async {
@@ -161,10 +231,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _locationShareTimer = null;
       if (_sharingInBackground) _stopBackgroundSharing();
       setState(() => _sharingLocation = false);
+      _syncNavBar();
       prefs.setSharingLocation(false);
       prefs.setSharingInBackground(false);
     } else {
       setState(() => _sharingLocation = true);
+      _syncNavBar();
       prefs.setSharingLocation(true);
       _sendMyLocation();
       _locationShareTimer = Timer.periodic(
@@ -282,14 +354,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         backgroundColor: t.nav,
         title: Text('Карта', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: t.textPrimary),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.my_location, color: notifier.accent),
-            onPressed: _myLocation != null
-                ? () => _mapController.move(_myLocation!, 15)
-                : null,
-          ),
-        ],
       ),
       body: Stack(
         children: [
@@ -299,6 +363,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               initialCenter: _defaultCenter,
               initialZoom: 13,
               onTap: (tapPos, latLng) {
+                if (_draggingMarkerId != null) {
+                  final id = _draggingMarkerId!;
+                  setState(() {
+                    _crossroadPos[id] = latLng;
+                    _draggingMarkerId = null;
+                  });
+                  context.read<ApiService>().setCrossroadPosition(id, latLng.latitude, latLng.longitude);
+                  return;
+                }
                 if (_pickingEventLocation) {
                   setState(() => _pickingEventLocation = false);
                   final prefs = context.read<PrefsService>();
@@ -310,6 +383,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.traffic.app',
+                tileProvider: _tileProvider,
               ),
               if (roadMarkers.isNotEmpty)
                 MarkerLayer(markers: roadMarkers),
@@ -339,48 +413,34 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 ]),
             ],
           ),
-          // Radial FAB — bottom left
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: _RadialFab(
-              onAddEvent: () => setState(() => _pickingEventLocation = true),
-              onToggleLocation: _toggleLocationSharing,
-              isSharing: _sharingLocation,
-            ),
-          ),
-          // Background sharing button — shown when actively sharing
-          if (_sharingLocation)
+          if (_draggingMarkerId != null)
             Positioned(
-              bottom: 24,
-              left: 72,
-              child: AnimatedOpacity(
-                opacity: _sharingLocation ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: GestureDetector(
-                  onTap: _sharingInBackground ? _stopBackgroundSharing : _startBackgroundSharing,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _sharingInBackground
-                          ? Colors.green.withValues(alpha: 0.9)
-                          : Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _sharingInBackground ? Icons.location_on : Icons.location_searching,
-                          color: Colors.white, size: 14,
+              bottom: 100,
+              left: 24,
+              right: 24,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.touch_app, color: Colors.yellow, size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Тапните на карту для нового положения маркера',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _sharingInBackground ? 'В фоне' : 'Делиться в фоне',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ],
-                    ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _draggingMarkerId = null),
+                        child: const Icon(Icons.close, color: Colors.white54, size: 20),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -424,6 +484,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<Marker> _buildRoadMarkers() {
     final markers = <Marker>[];
+    final prefs = context.read<PrefsService>();
     const roads = [
       ('pereval',  'П', LatLng(52.660, 90.110)),
       ('abaza',    'А', LatLng(52.650, 90.100)),
@@ -431,33 +492,42 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     ];
 
     for (final (id, label, defaultPos) in roads) {
-      final pos = defaultPos;
+      final pos = _crossroadPos[id] ?? defaultPos;
       final state = _snapshot?[id].state;
       final color = _markerColor(state);
+      final isDragging = _draggingMarkerId == id;
 
       markers.add(Marker(
         point: pos,
         width: 44, height: 52,
-        child: Column(
-          children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.85),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8)],
+        child: GestureDetector(
+          onLongPress: prefs.isAdmin
+              ? () => setState(() => _draggingMarkerId = id)
+              : null,
+          child: Column(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: isDragging ? 1.0 : 0.85),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: isDragging ? Colors.yellow : Colors.white, width: 2),
+                  boxShadow: [BoxShadow(
+                      color: color.withValues(alpha: isDragging ? 0.8 : 0.4),
+                      blurRadius: isDragging ? 16 : 8)],
+                ),
+                child: Center(
+                  child: Text(label, style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
               ),
-              child: Center(
-                child: Text(label, style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              CustomPaint(
+                size: const Size(2, 12),
+                painter: _PinTailPainter(color: isDragging ? Colors.yellow : color),
               ),
-            ),
-            CustomPaint(
-              size: const Size(2, 12),
-              painter: _PinTailPainter(color: color),
-            ),
-          ],
+            ],
+          ),
         ),
       ));
     }
@@ -873,160 +943,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-}
-
-// ── Radial FAB ────────────────────────────────────────────────────────────────
-
-class _RadialFab extends StatefulWidget {
-  final VoidCallback onAddEvent;
-  final VoidCallback onToggleLocation;
-  final bool isSharing;
-
-  const _RadialFab({
-    required this.onAddEvent,
-    required this.onToggleLocation,
-    required this.isSharing,
-  });
-
-  @override
-  State<_RadialFab> createState() => _RadialFabState();
-}
-
-class _RadialFabState extends State<_RadialFab> {
-  bool _open = false;
-
-  static const _duration = Duration(milliseconds: 220);
-  static const _curve = Curves.easeOut;
-
-  void _toggle() => setState(() => _open = !_open);
-
-  @override
-  Widget build(BuildContext context) {
-    final fabNotifier = Provider.of<AppThemeNotifier>(context);
-    final t = fabNotifier.current;
-    return SizedBox(
-      width: 48,
-      height: 180,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Sub-button: location sharing (lower, 60px above main)
-          AnimatedPositioned(
-            duration: _duration,
-            curve: _curve,
-            bottom: _open ? 60.0 : 0.0,
-            left: 0,
-            child: AnimatedOpacity(
-              duration: _duration,
-              opacity: _open ? 1.0 : 0.0,
-              child: AnimatedScale(
-                scale: _open ? 1.0 : 0.5,
-                duration: _duration,
-                child: _SubFab(
-                  icon: widget.isSharing ? Icons.location_on : Icons.location_off,
-                  color: widget.isSharing ? Colors.green : t.textSecondary.withValues(alpha: 0.8),
-                  label: widget.isSharing ? 'Остановить' : 'Геолокация',
-                  tooltip: widget.isSharing ? 'Остановить трансляцию' : 'Поделиться локацией',
-                  onPressed: () {
-                    _toggle();
-                    widget.onToggleLocation();
-                  },
-                ),
-              ),
-            ),
-          ),
-          // Sub-button: add event (higher, 120px above main)
-          AnimatedPositioned(
-            duration: _duration,
-            curve: _curve,
-            bottom: _open ? 120.0 : 0.0,
-            left: 0,
-            child: AnimatedOpacity(
-              duration: _duration,
-              opacity: _open ? 1.0 : 0.0,
-              child: AnimatedScale(
-                scale: _open ? 1.0 : 0.5,
-                duration: _duration,
-                child: _SubFab(
-                  icon: Icons.add_location_alt_outlined,
-                  color: fabNotifier.accent,
-                  label: 'Добавить событие',
-                  tooltip: 'Добавить событие',
-                  onPressed: () {
-                    _toggle();
-                    widget.onAddEvent();
-                  },
-                ),
-              ),
-            ),
-          ),
-          // Main FAB (always at bottom=0)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: FloatingActionButton(
-              heroTag: 'radial_main',
-              mini: true,
-              backgroundColor: t.nav,
-              elevation: 4,
-              onPressed: _toggle,
-              child: AnimatedRotation(
-                turns: _open ? 0.125 : 0,
-                duration: _duration,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubFab extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  const _SubFab({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton(
-          heroTag: tooltip,
-          mini: true,
-          backgroundColor: color,
-          elevation: 3,
-          onPressed: onPressed,
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black54,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ── Pin tail painter ──────────────────────────────────────────────────────────
