@@ -26,7 +26,7 @@ class UpdateLogger {
 }
 
 class UpdateService {
-  static const currentVersion = '1.2.22';
+  static const currentVersion = '1.2.23';
   static const _installerChannel = MethodChannel('com.traffic.app/installer');
   static const taskName = 'eos_update_check';
   static const notifChannelId = 'eos_updates';
