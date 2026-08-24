@@ -54,6 +54,8 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
         (_) { if (mounted) setState(() => _cursorOn = !_cursorOn); });
     _rejected = context.read<PrefsService>().approvalStatus == 'rejected';
     _runBoot();
+    // Гарантируем что запись на сервере создана (на случай если POST/request упал при входе)
+    if (widget.revokedFrom == null) _ensureRequested();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _poll());
   }
 
@@ -208,6 +210,36 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
         await _type('  Ожидание подтверждения ключа доступа', _yellow, 14);
         _add('', _dim);
         _startDots();
+      }
+    } catch (_) {}
+  }
+
+  // Ретрай /approval/request если запись не дошла до сервера при входе
+  Future<void> _ensureRequested() async {
+    if (!mounted) return;
+    final prefs = context.read<PrefsService>();
+    if (prefs.isAdmin || prefs.googleEmail.isEmpty) return;
+    try {
+      final api = context.read<ApiService>();
+      final status = await api.requestApproval(
+        email: prefs.googleEmail,
+        displayName: prefs.profileName.isNotEmpty ? prefs.profileName : prefs.googleName,
+        deviceId: prefs.deviceId,
+        deviceName: '',
+      );
+      await prefs.setApprovalStatus(status);
+      if (!mounted) return;
+      if (status == 'approved') {
+        Navigator.of(context).pushReplacement(PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const MainShell(),
+          transitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+        ));
+      } else if (status == 'rejected') {
+        if (!_rejected) {
+          setState(() => _rejected = true);
+          await _showRejectedInline();
+        }
       }
     } catch (_) {}
   }
