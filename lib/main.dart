@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,9 @@ final FlutterLocalNotificationsPlugin localNotifPlugin = FlutterLocalNotificatio
 
 // Текущий открытый канал — для фильтрации уведомлений
 String? currentChatChannelId;
+
+// Мгновенное уведомление о смене статуса доступа (suspended / rejected)
+final accessRevokedStream = StreamController<String>.broadcast();
 
 // ── Workmanager background entry point ──────────────────────────────────────
 
@@ -139,6 +143,13 @@ Future<void> main() async {
   // FCM
   FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
   FirebaseMessaging.onMessage.listen((msg) async {
+    // Мгновенная реакция на смену статуса доступа
+    final action = msg.data['action'] ?? '';
+    if (action == 'access_suspended' || action == 'access_rejected') {
+      accessRevokedStream.add(action == 'access_suspended' ? 'suspended' : 'rejected');
+      return;
+    }
+
     final title = msg.notification?.title ?? msg.data['sender'] ?? 'EOS';
     final body  = msg.notification?.body  ?? msg.data['text']   ?? '';
     if (body.isEmpty) return;

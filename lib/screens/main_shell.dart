@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../main.dart' show accessRevokedStream;
 import '../services/api_service.dart';
 import '../services/nav_bar_controller.dart';
 import '../services/prefs_service.dart';
@@ -24,6 +25,7 @@ class _MainShellState extends State<MainShell> with RouteAware {
   int _index = 0;
   Timer? _unreadTimer;
   Timer? _accessTimer;
+  StreamSubscription<String>? _accessSub;
   bool _revokedOverlayShown = false;
   NavBarController? _navCtrl;
 
@@ -64,6 +66,12 @@ class _MainShellState extends State<MainShell> with RouteAware {
         const Duration(seconds: 45),
         (_) { if (mounted) _checkAccess(); },
       );
+      _accessSub = accessRevokedStream.stream.listen((status) {
+        if (!mounted || _revokedOverlayShown) return;
+        _revokedOverlayShown = true;
+        _accessTimer?.cancel();
+        _showRevokedOverlay(status);
+      });
     }
   }
 
@@ -74,6 +82,7 @@ class _MainShellState extends State<MainShell> with RouteAware {
     _navCtrl?.registerTabSwitch((_) {});
     _unreadTimer?.cancel();
     _accessTimer?.cancel();
+    _accessSub?.cancel();
     super.dispose();
   }
 
