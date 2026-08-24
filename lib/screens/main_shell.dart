@@ -11,7 +11,7 @@ import 'home_screen.dart';
 import 'friends_screen.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
-import '../widgets/revoked_animation.dart';
+import 'block_key_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -105,7 +105,7 @@ class _MainShellState extends State<MainShell> with RouteAware {
   void _goToRevoked(String status) {
     Navigator.of(context).pushAndRemoveUntil(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => RevokedAnimation(status: status),
+        pageBuilder: (_, __, ___) => BlockKeyScreen(status: status),
         transitionDuration: Duration.zero,
       ),
       (_) => false,
