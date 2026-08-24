@@ -7,7 +7,10 @@ import 'main_shell.dart';
 import 'login_screen.dart';
 
 class ApprovalPendingScreen extends StatefulWidget {
-  const ApprovalPendingScreen({super.key});
+  /// Если не null — значит пользователя выбросило из приложения.
+  /// 'suspended' | 'rejected'
+  final String? revokedFrom;
+  const ApprovalPendingScreen({super.key, this.revokedFrom});
 
   @override
   State<ApprovalPendingScreen> createState() => _ApprovalPendingScreenState();
@@ -20,14 +23,15 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
 
   final _lines      = <_TLine>[];
   final _scrollCtrl = ScrollController();
-  bool   _cursorOn  = true;
-  bool   _rejected  = false;
-  int    _dots      = 0;
+  bool  _cursorOn   = true;
+  bool  _rejected   = false;
+  int   _dots       = 0;
 
   static const _green  = Color(0xFF3DFF7A);
   static const _dim    = Color(0xFF1D6B38);
   static const _cyan   = Color(0xFF38D0FF);
   static const _red    = Color(0xFFFF4455);
+  static const _orange = Color(0xFFFF9800);
   static const _yellow = Color(0xFFFFD060);
 
   static const _bg1 = Color(0xFF050C18);
@@ -53,18 +57,65 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
     super.dispose();
   }
 
+  // ── Загрузочные последовательности ────────────────────────────────────────
+
   Future<void> _runBoot() async {
-    await _wait(200);
+    await _wait(150);
     _add('', _dim);
     _add('  EOS SECURE SYSTEM', _green);
     _add('  ───────────────────────────────────', _dim);
     _add('', _dim);
-    await _wait(250);
+    await _wait(200);
 
+    if (widget.revokedFrom != null) {
+      await _runRevocationSequence(widget.revokedFrom!);
+    } else {
+      await _runWaitingSequence();
+    }
+  }
+
+  Future<void> _runRevocationSequence(String status) async {
+    final isSuspended = status == 'suspended';
+    final accentColor = isSuspended ? _orange : _red;
+
+    await _type('> access_key.verify()', _cyan, 18);
+    await _wait(400);
+
+    _add('', _dim);
+    if (isSuspended) {
+      _add('  ⚠  KEY SUSPENDED', accentColor);
+    } else {
+      _add('  ✗  ACCESS REVOKED', accentColor);
+    }
+    await _wait(120);
+    _add('', _dim);
+    if (isSuspended) {
+      await _type('  Ключ доступа приостановлен', accentColor, 14);
+      _add('  Администратор временно ограничил доступ', _dim);
+    } else {
+      await _type('  Ключ доступа отозван', accentColor, 14);
+      _add('  Администратор отозвал ваш доступ', _dim);
+      setState(() => _rejected = true);
+    }
+    _add('', _dim);
+    await _wait(500);
+    await _type('> redirect.to_standby()', _dim, 16);
+    _add('', _dim);
+
+    if (isSuspended) {
+      await _type('  Ожидание подтверждения ключа доступа', _yellow, 14);
+      _add('', _dim);
+      _startDots();
+    } else {
+      await _type('> auth.logout --force', _dim, 16);
+    }
+  }
+
+  Future<void> _runWaitingSequence() async {
     await _type('> access_key.verify()', _cyan, 20);
 
     if (_rejected) {
-      await _showRejected();
+      await _showRejectedInline();
     } else {
       _add('    Запрос отправлен администратору', _dim);
       _add('', _dim);
@@ -74,6 +125,8 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
     }
   }
 
+  // ── Динамические изменения состояния ──────────────────────────────────────
+
   void _startDots() {
     if (!mounted) return;
     _add('> ', _dim);
@@ -82,15 +135,12 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
       if (!mounted) return;
       _dots = (_dots + 1) % 4;
       setState(() {
-        _lines[_lines.length - 1] = _TLine(
-          '> ожидание${'.' * _dots}',
-          _dim,
-        );
+        _lines[_lines.length - 1] = _TLine('> ожидание${'.' * _dots}', _dim);
       });
     });
   }
 
-  Future<void> _showRejected() async {
+  Future<void> _showRejectedInline() async {
     _dotsTimer?.cancel();
     _add('', _dim);
     _add('    ✗ ACCESS DENIED', _red);
@@ -123,9 +173,12 @@ class _ApprovalPendingScreenState extends State<ApprovalPendingScreen> {
       } else if (status == 'rejected' && !_rejected) {
         _dotsTimer?.cancel();
         setState(() => _rejected = true);
-        await _showRejected();
+        await _showRejectedInline();
       } else if ((status == 'pending' || status == 'suspended') && _rejected) {
-        setState(() { _rejected = false; });
+        setState(() => _rejected = false);
+        _add('', _dim);
+        await _type('  Ожидание подтверждения ключа доступа', _yellow, 14);
+        _add('', _dim);
         _startDots();
       }
     } catch (_) {}
